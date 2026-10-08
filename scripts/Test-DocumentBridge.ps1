@@ -1,7 +1,10 @@
 param([switch]$Visible)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
+dotnet build (Join-Path $repo 'src/VRoidXYTool.IL2CPP') -c Release --no-restore
+if ($LASTEXITCODE -ne 0) { throw 'Build failed; no test plugin deployed.' }
 $appRoot = Join-Path $repo '.local/VRoidStudio'
+if (Get-Process VRoidStudio -ErrorAction SilentlyContinue) { throw 'Close VRoid Studio before deploying the diagnostic.' }
 $pluginRoot = Join-Path $appRoot 'BepInEx/plugins/VRoidXYTool.IL2CPP'
 Copy-Item -LiteralPath (Join-Path $repo 'src/VRoidXYTool.IL2CPP/bin/Release/net6.0/VRoidXYTool.IL2CPP.dll') -Destination $pluginRoot -Force
 Copy-Item -LiteralPath (Join-Path $repo 'src/VRoidXYTool.SyncCore/bin/Release/net6.0/VRoidXYTool.SyncCore.dll') -Destination $pluginRoot -Force

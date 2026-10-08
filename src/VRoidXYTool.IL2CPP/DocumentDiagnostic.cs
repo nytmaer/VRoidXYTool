@@ -7,6 +7,8 @@ using UnityEngine;
 using VRoid.Studio;
 using VRoidCore.Common.SpecificTypes;
 using VRoidCore.Editing.Query;
+using VRoidCore.Editing;
+using VRoidCore.Editing.History.Command;
 using VRoidStudio.GUI.AvatarEditor;
 
 namespace VRoidXYTool.IL2CPP;
@@ -30,6 +32,10 @@ internal sealed class DocumentDiagnostic
     private int saves;
     private TimeSpan next;
     private bool complete;
+    private bool historyFinished;
+    private string historyFailure;
+    private byte[] exportedBaseline;
+    private float expectedBlue;
 
     internal DocumentDiagnostic(Plugin plugin, ManualLogSource log, string requestedPath)
     {
@@ -95,6 +101,7 @@ internal sealed class DocumentDiagnostic
                 if (otherPath != null) otherBaseline = PixelsHash(context, otherPath);
                 pngPath = plugin.Bridge.ExportPath(path, "diagnostic layer");
                 if (pngPath == null) throw new InvalidOperationException("Export did not create a file.");
+                exportedBaseline = File.ReadAllBytes(pngPath);
                 log.LogInfo("DIAGNOSTIC: raster export PASS; PNG=" + pngPath);
                 stage = 2;
             }
@@ -117,16 +124,68 @@ internal sealed class DocumentDiagnostic
                 if (saves < 5) stage = 2;
                 else
                 {
-                    if (!main.ActionHandler.SaveSync(modelPath, false)) throw new InvalidOperationException("SaveSync failed.");
-                    log.LogInfo("DIAGNOSTIC: project saved; reopening copy.");
-                    opening = main.ActionHandler.Open(modelPath, false);
-                    stage = 4;
+                    // Keep the first link alive while editing a second structural layer.
+                    var first = path;
+                    path = otherPath;
+                    otherPath = first;
+                    otherBaseline = expected;
+                    baseline = PixelsHash(context);
+                    pngPath = plugin.Bridge.ExportPath(path, "second diagnostic layer");
+                    exportedBaseline = File.ReadAllBytes(pngPath);
+                    File.WriteAllBytes(Path.Combine(output, "candidate.png"), new byte[] { 1, 2, 3, 4 });
+                    File.WriteAllText(Path.Combine(output, "request.txt"), pngPath);
+                    next = clock.Elapsed + TimeSpan.FromSeconds(4);
+                    stage = 6;
                 }
+            }
+            else if (stage == 6)
+            {
+                if (PixelsHash(context) != baseline || PixelsHash(context, otherPath) != otherBaseline)
+                    throw new InvalidOperationException("Invalid PNG changed document pixels.");
+                log.LogInfo("DIAGNOSTIC: invalid PNG rejection PASS; testing valid recovery with two links.");
+                CreateExternalSave();
+                stage = 7;
+            }
+            else if (stage == 7)
+            {
+                if (PixelsHash(context) == baseline) return;
+                AssertMarker(context);
+                if (PixelsHash(context, otherPath) != otherBaseline) throw new InvalidOperationException("First linked layer changed during second-layer import.");
+                expected = PixelsHash(context);
+                log.LogInfo("DIAGNOSTIC: simultaneous links and valid PNG recovery PASS.");
+                context.FlushPendingHistory(false);
+                if (!context.CanUndo) throw new InvalidOperationException("Imported edit has no undo history.");
+                historyFinished = false;
+                context.UndoAsync((Il2CppSystem.Action)(() => historyFinished = true),
+                    (Il2CppSystem.Action<Il2CppSystem.Exception>)(e => { historyFailure = e.ToString(); historyFinished = true; }));
+                stage = 8;
+            }
+            else if (stage == 8)
+            {
+                if (!historyFinished) return;
+                if (historyFailure != null) throw new InvalidOperationException(historyFailure);
+                if (PixelsHash(context) != baseline) throw new InvalidOperationException("Undo did not restore previous raster pixels.");
+                if (!context.CanRedo) throw new InvalidOperationException("Imported edit cannot be redone.");
+                historyFinished = false;
+                context.RedoAsync((Il2CppSystem.Action)(() => historyFinished = true),
+                    (Il2CppSystem.Action<Il2CppSystem.Exception>)(e => { historyFailure = e.ToString(); historyFinished = true; }));
+                stage = 9;
+            }
+            else if (stage == 9)
+            {
+                if (!historyFinished) return;
+                if (historyFailure != null) throw new InvalidOperationException(historyFailure);
+                if (PixelsHash(context) != expected) throw new InvalidOperationException("Redo did not restore imported raster pixels.");
+                log.LogInfo("DIAGNOSTIC: native undo/redo pixel roundtrip PASS.");
+                if (!main.ActionHandler.SaveSync(modelPath, false)) throw new InvalidOperationException("SaveSync failed.");
+                opening = main.ActionHandler.Open(modelPath, false);
+                stage = 4;
             }
             else if (stage == 4)
             {
                 if (PixelsHash(context) != expected) throw new InvalidOperationException("Saved raster pixels changed after reopen.");
                 log.LogInfo("DIAGNOSTIC: save/reopen pixel persistence PASS.");
+                saves = 6; // The old-link write must differ from the sixth imported marker.
                 CreateExternalSave();
                 next = clock.Elapsed + TimeSpan.FromSeconds(4);
                 stage = 5;
@@ -137,7 +196,33 @@ internal sealed class DocumentDiagnostic
                 if (otherPath != null && PixelsHash(context, otherPath) != otherBaseline)
                     throw new InvalidOperationException("Unlinked layer changed after reopen.");
                 log.LogInfo("DIAGNOSTIC: old-link invalidation and unlinked-layer isolation PASS.");
-                File.WriteAllText(Path.Combine(output, "result.txt"), "PASS: export, five externally saved PNG imports with marker verification, save/reopen pixel persistence, old-link invalidation, unlinked-layer isolation.");
+                pngPath = plugin.Bridge.ExportPath(path, "deleted-layer diagnostic");
+                exportedBaseline = File.ReadAllBytes(pngPath);
+                context.ExecuteSyncCommand(new DeleteEditableImageRasterLayerCommand(path).Cast<ISyncCommand<Context.HistoryManagerContext, Model>>());
+                context.FlushPendingHistory(false);
+                saves = 6;
+                CreateExternalSave();
+                next = clock.Elapsed + TimeSpan.FromSeconds(4);
+                stage = 10;
+            }
+            else if (stage == 10)
+            {
+                foreach (var layer in new GetEditableImageRasterLayersQuery(path.EditableImagePath).Execute(context.ActiveModel))
+                    if (layer.NodeId == path.NodeId) throw new InvalidOperationException("Deleted linked layer was recreated by import.");
+                if (PixelsHash(context, otherPath) != otherBaseline) throw new InvalidOperationException("Deleted link redirected to another layer.");
+                plugin.Bridge.ClearLinks();
+                historyFinished = false;
+                context.UndoAsync((Il2CppSystem.Action)(() => historyFinished = true),
+                    (Il2CppSystem.Action<Il2CppSystem.Exception>)(e => { historyFailure = e.ToString(); historyFinished = true; }));
+                stage = 11;
+            }
+            else if (stage == 11)
+            {
+                if (!historyFinished) return;
+                if (historyFailure != null) throw new InvalidOperationException(historyFailure);
+                if (PixelsHash(context) != expected) throw new InvalidOperationException("Undo of test deletion did not restore saved pixels.");
+                log.LogInfo("DIAGNOSTIC: deleted-layer destination isolation PASS.");
+                File.WriteAllText(Path.Combine(output, "result.txt"), "PASS: six imports, simultaneous links, invalid PNG recovery, undo/redo, persistence, document invalidation, deleted-layer isolation.");
                 complete = true;
                 Application.Quit();
             }
@@ -167,7 +252,7 @@ internal sealed class DocumentDiagnostic
             if (!ImageConversion.LoadImage(image, VRoid.Studio.Util.ImageEncodingUtil.EncodeToPNG(result.size, result.rgbaBytes), false))
                 throw new InvalidDataException("Imported raster failed roundtrip decode.");
             var color = image.GetPixel(0, 0);
-            if (Math.Abs(color.r - (saves + 1) / 8f) > 1f / 255 || Math.Abs(color.g - 0.25f) > 1f / 255 || Math.Abs(color.b - 0.75f) > 1f / 255 || color.a < 0.99f)
+            if (Math.Abs(color.r - (saves + 1) / 8f) > 1f / 255 || Math.Abs(color.g - 0.25f) > 1f / 255 || Math.Abs(color.b - expectedBlue) > 1f / 255 || color.a < 0.99f)
                 throw new InvalidOperationException("Imported marker pixels do not match externally saved PNG.");
         }
         finally { if (image != null) UnityEngine.Object.Destroy(image); }
@@ -179,8 +264,10 @@ internal sealed class DocumentDiagnostic
         try
         {
             image = new Texture2D(1, 1, TextureFormat.RGBA32, false, false);
-            if (!ImageConversion.LoadImage(image, File.ReadAllBytes(pngPath), false)) throw new InvalidDataException("Exported PNG failed decode.");
-            image.SetPixel(0, 0, new UnityEngine.Color((saves + 1) / 8f, 0.25f, 0.75f, 1f));
+            if (!ImageConversion.LoadImage(image, exportedBaseline, false)) throw new InvalidDataException("Exported PNG failed decode.");
+            // Ensure rerunning against an already marked disposable model still changes pixels.
+            expectedBlue = image.GetPixel(0, 0).b > 0.5f ? 0.25f : 0.75f;
+            image.SetPixel(0, 0, new UnityEngine.Color((saves + 1) / 8f, 0.25f, expectedBlue, 1f));
             image.Apply();
             // Produce a fixture only. The shell driver performs the external file save.
             string candidate = Path.Combine(output, "candidate.png");

@@ -1,0 +1,14 @@
+name: Texture synchronization core
+on:
+  push:
+    branches: [dev/il2cpp-migration]
+  pull_request:
+jobs:
+  regressions:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet run --project tests/VRoidXYTool.SyncCore.Tests -c Release -p:NuGetAudit=false

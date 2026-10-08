@@ -125,3 +125,17 @@ Interactive test on the same disposable Song copy, normal-mode process 336480:
 * Removed repetitive selection logging after verification. Final build differs from the interactive test only in that logging removal.
 
 Krita PNG save interoperability and single-link material switching are now exercised. The prior diagnostic separately verifies five imports, byte-level layer isolation and save/reopen persistence. Photoshop, two simultaneous UI links, deleted-layer behavior, full native undo/history behavior and systematic pointer-blocking checks remain pending. The panel is small at high DPI and still needs UI polish. No original model or installed VRoid binaries were edited.
+
+## Expanded acceptance and panel polish — October 8, 2026
+
+The expanded normal-mode diagnostic verifies six imports across two simultaneously linked raster destinations, complete pixel-hash isolation, invalid PNG rejection followed by valid-file recovery, native Context.UndoAsync/RedoAsync pixel restoration, saved/reopened raster hashes and document-session invalidation. It also deletes one linked layer through a native command on the disposable document, changes that PNG, and requires the destination to stay deleted while the other layer stays unchanged. It clears links, undoes the test deletion and confirms restored saved pixels before quitting normally. The expected missing-layer warning is a deferred import, not a crash.
+
+Test-fixture fixes retain a valid baseline while deliberately corrupting the external file and choose a marker color that differs from existing model pixels. The old-link test uses a distinct seventh marker. The driver now builds synchronously before copying DLLs and rejects deployment while VRoid is running. These changes make repeated runs against the same disposable project meaningful and prevent testing stale binaries.
+
+The control panel now has larger explicit fonts, an opaque backdrop, clear Tab guidance, disabled unavailable actions and a matching 780x260 pointer blocker. Its native style copy uses generated Unity methods because the managed copy constructor is stripped. The original shared GUI skin is unchanged.
+
+Added an installation guide and Windows GitHub Actions coverage for the dependency-free synchronization harness. The application adapter still requires locally generated VRoid interop assemblies; CI does not distribute or compile against proprietary application binaries.
+
+Remaining limits are Photoshop-specific saves, full two-layer UI workflows and broad screen-size/version coverage. Native document undo/redo is verified; every possible UI history interaction is not certified. Copying VRoid isolates binaries but shares per-user custom-item/preferences storage. Original Song source SHA256 remains unchanged.
+
+Final candidate: normal-mode PID 347052, plugin DLL SHA256 `49F610F435C5E6BED02F5E8E51B2C52D3CB2215619A19D29E05CEF9C43A96DF8`. The final driver returned PASS and exit code 0, including a distinct seventh marker for the old-link and deleted-layer checks. Release build had zero warnings/errors; all file-core regressions and `git diff --check` passed. Diagnostic configuration is reset to disabled after testing.

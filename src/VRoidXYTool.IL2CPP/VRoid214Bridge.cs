@@ -41,6 +41,9 @@ internal sealed class VRoid214Bridge : IDisposable
     private string exportedPath;
     private bool ownsBackgroundSetting;
     private bool originalBackgroundSetting;
+    private GUIStyle panelStyle;
+    private GUIStyle textStyle;
+    private GUIStyle buttonStyle;
     private string status = "Open texture editing, select a raster layer, then link it.";
 
     public VRoid214Bridge(ManualLogSource log, string directory, bool showOnStartup = true)
@@ -124,29 +127,54 @@ internal sealed class VRoid214Bridge : IDisposable
     public void OnGUI()
     {
         if (!show || disposed) return;
-        // Fixed panel keeps native editor shortcuts and unrelated legacy tools out of this prototype.
-        GUI.Box(new Rect(20, 20, 580, 200), "VRoidXYTool — Live Texture Prototype");
-        GUI.Label(new Rect(35, 50, 550, 40), status);
+        // Explicit styles avoid changing VRoid's shared GUI skin and remain readable at high DPI.
+        panelStyle ??= CopyStyle(GUI.skin.box, 20);
+        textStyle ??= CopyStyle(GUI.skin.label, 18);
+        buttonStyle ??= CopyStyle(GUI.skin.button, 18);
+        var previousColor = GUI.color;
+        GUI.color = new UnityEngine.Color(0.08f, 0.08f, 0.08f, 0.97f);
+        GUI.DrawTexture(new Rect(20, 20, 780, 260), Texture2D.whiteTexture);
+        GUI.color = previousColor;
+        GUI.Box(new Rect(20, 20, 780, 260), "VRoidXYTool — Live Texture Sync (Tab to hide)", panelStyle);
+        GUI.Label(new Rect(35, 55, 745, 55), status, textStyle);
         try
         {
             bool available = HasCurrentLayer(out var layer);
-            GUI.Label(new Rect(35, 92, 550, 22), available ? "Selected: " + layer.TranslatedDisplayName : "No current raster layer.");
-            if (GUI.Button(new Rect(35, 122, 190, 30), "Link / export selected") && available) Export(layer);
-            if (GUI.Button(new Rect(235, 122, 160, 30), "Unlink all"))
+            GUI.Label(new Rect(35, 112, 745, 32), available ? "Selected: " + layer.TranslatedDisplayName : "Select a raster layer in texture editing.", textStyle);
+            bool previousEnabled = GUI.enabled;
+            GUI.enabled = previousEnabled && available;
+            bool export = GUI.Button(new Rect(35, 150, 250, 42), "Link / export selected", buttonStyle);
+            GUI.enabled = previousEnabled;
+            if (export) Export(layer);
+            if (GUI.Button(new Rect(300, 150, 180, 42), "Unlink all", buttonStyle))
             {
                 ClearLinks();
                 status = "Texture links cleared.";
             }
-            GUI.Label(new Rect(405, 126, 170, 24), $"Links: {links.Count}");
-            if (GUI.Button(new Rect(35, 162, 190, 30), "Copy linked PNG path") && exportedPath != null)
+            GUI.Label(new Rect(500, 156, 270, 32), $"Linked layers: {links.Count}", textStyle);
+            GUI.enabled = previousEnabled && exportedPath != null;
+            bool copy = GUI.Button(new Rect(35, 210, 250, 42), "Copy linked PNG path", buttonStyle);
+            GUI.enabled = previousEnabled;
+            if (copy)
                 GUIUtility.systemCopyBuffer = exportedPath;
-            GUI.Label(new Rect(235, 166, 340, 24), "Save your .vroid to preserve imported edits.");
+            GUI.Label(new Rect(300, 210, 475, 52), "Save your .vroid to preserve imported edits.", textStyle);
         }
         catch (Exception error) { Report(error); }
     }
 
     private LayerIdentity Identity(EditableImageRasterLayerPath path) => new(session,
         path.EditableImagePath.TransferableId + "/" + path.EditableImagePath.ImageId, path.NodeId);
+
+    private static GUIStyle CopyStyle(GUIStyle source, int fontSize)
+    {
+        // Unity strips the managed copy constructor; use its generated native copy operation.
+        var style = new GUIStyle();
+        GUIStyle.Internal_Destroy(style.m_Ptr);
+        style.m_Ptr = GUIStyle.Internal_Copy(style, source);
+        style.fontSize = fontSize;
+        style.wordWrap = true;
+        return style;
+    }
 
     private void Export(RasterLayerViewModel layer)
     {
@@ -217,7 +245,7 @@ internal sealed class VRoid214Bridge : IDisposable
         log.LogWarning(error);
     }
 
-    private void ClearLinks()
+    internal void ClearLinks()
     {
         foreach (var link in links.Values) link.File.Dispose();
         links.Clear();
@@ -242,7 +270,7 @@ internal sealed class VRoid214Bridge : IDisposable
         rect.SetParent(blockerCanvas.transform, false);
         rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0, 1);
         rect.anchoredPosition = new Vector2(20, -20);
-        rect.sizeDelta = new Vector2(580, 200);
+        rect.sizeDelta = new Vector2(780, 260);
         var image = blocker.AddComponent<UnityEngine.UI.Image>();
         image.color = UnityEngine.Color.clear;
         image.raycastTarget = true;
