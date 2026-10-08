@@ -23,7 +23,7 @@ Launch `.local/VRoidStudio/VRoidStudio.exe` interactively. The installed Steam c
 ## Editing workflow
 
 1. Copy an existing `.vroid` into `.local/test-models/` and open that copy in the isolated application.
-2. Enter texture editing and select a raster layer. Press **Tab** to show the plugin panel.
+2. Enter texture editing and select a raster layer. The panel appears on startup by default (`TextureSync.ShowControlsOnStartup`); **Tab** toggles it.
 3. Click **Link / export selected**. The plugin exports only that raster layer. It retains the full editable-image/layer path and document session.
 4. Click **Copy linked PNG path** and open that path in Photoshop, Krita or another PNG editor. Exact paths are also logged in BepInEx/LogOutput.log.
 5. Save the PNG. The plugin polls every 250 ms, waits for 500 ms of stable content, checks PNG completeness and bounds, decodes it, and executes the document's LoadImageToEditableImageRasterLayerCommand for the original linked layer.
@@ -37,7 +37,7 @@ The panel includes a transparent uGUI raycast blocker to keep pointer input off 
 
 PNG files are limited to 64 MiB compressed and 4096 pixels on each axis before decode. The guard checks chunk bounds and IEND but does not replace the Unity image decoder or validate every PNG semantic rule. Missing, locked and incomplete files remain pending. Failed command/decode operations retry; warnings are limited to once per five seconds. Deleted layers fail the document query rather than being redirected to a selected replacement.
 
-The adapter is version-specific and uses generated private VRoid APIs. It hooks `TextureEditor.ViewModel.OnSelectedLayerUpdated`, not a constructor, to capture the active editor. The document diagnostic discovers layer paths through VRoid queries and invokes the same export/import implementation as the panel. It verifies the document-editing path; it does not exercise the panel's selected-layer capture or pointer handling.
+The adapter is version-specific and uses generated private VRoid APIs. It hooks both `TextureEditor.ViewModel.SelectedLayer`'s setter and `OnSelectedLayerUpdated` to capture the active editor. The setter is necessary for normal UI selection. Tab uses BepInEx's UnityInput adapter. The document diagnostic discovers layer paths through VRoid queries and invokes the same export/import implementation as the panel. It verifies the document-editing path; interactive checks are recorded separately in COMPATIBILITY_RESULTS.md.
 
 ## Acceptance checklist
 

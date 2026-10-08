@@ -43,15 +43,18 @@ internal sealed class VRoid214Bridge : IDisposable
     private bool originalBackgroundSetting;
     private string status = "Open texture editing, select a raster layer, then link it.";
 
-    public VRoid214Bridge(ManualLogSource log, string directory)
+    public VRoid214Bridge(ManualLogSource log, string directory, bool showOnStartup = true)
     {
         this.log = log;
         this.directory = Path.GetFullPath(directory);
+        show = showOnStartup;
         active = this;
         try
         {
-            // A selection event avoids detouring an IL2CPP constructor.
+            // Native selection uses the setter; the update event alone misses normal UI selection.
             harmony.Patch(AccessTools.Method(typeof(EditorVM), "OnSelectedLayerUpdated"),
+                postfix: new HarmonyMethod(typeof(VRoid214Bridge), nameof(SelectionUpdated)));
+            harmony.Patch(AccessTools.PropertySetter(typeof(EditorVM), "SelectedLayer"),
                 postfix: new HarmonyMethod(typeof(VRoid214Bridge), nameof(SelectionUpdated)));
             CreateInputBlocker();
             log.LogInfo("VRoid 2.14 texture selection hook installed. Tab opens linked texture controls.");
@@ -76,7 +79,11 @@ internal sealed class VRoid214Bridge : IDisposable
         if (disposed) return;
         try
         {
-            if (Input.GetKeyDown(KeyCode.Tab)) show = !show;
+            if (BepInEx.UnityInput.Current.GetKeyDown(KeyCode.Tab))
+            {
+                show = !show;
+                log.LogInfo("Texture controls visible: " + show);
+            }
             if (blocker != null) blocker.SetActive(show);
             RefreshDocument();
             if (clock.Elapsed < nextPoll) return;

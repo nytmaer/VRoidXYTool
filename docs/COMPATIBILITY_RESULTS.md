@@ -113,3 +113,15 @@ Runtime issues found and fixed: IL2CPP callback wrappers did not reliably expose
 Earlier batch tests verified startup and OnApplicationQuit only. Player logs reveal that VRoid's DeepLinkReceiver automatically quits batch mode, so those runs did **not** validate the QuitAfterSeconds timer or a loaded document. Hidden-window document launches did not progress reliably; visible tests did. Final document tests use visible normal-mode windows and finish through the diagnostic's normal Application.Quit. The Class::Init fallback warning remains, but the tested generic queries and import command execute successfully.
 
 Remaining limits: the diagnostic bypasses the panel's selected-layer capture; Tab controls, pointer blocking, active UI layer/material switching, undo behavior and Photoshop/Krita-specific save behavior have not been exercised. File locks/rename/truncation are covered by the core harness rather than application-level editor saves. Existing links are intentionally not restored after reopening; imported project content persists. Full user-facing acceptance remains pending these checks.
+
+## Native controls and Krita follow-up — October 8, 2026
+
+Interactive test on the same disposable Song copy, normal-mode process 336480:
+
+* Fixed Tab by using BepInEx.UnityInput.Current; observed the panel show/hide. Added configurable startup visibility, default true, and confirmed OnGUI execution.
+* The original update-event hook installed but missed actual UI selection. Adding a postfix on SelectedLayer's setter captured the selected Default Design iris layer and the Eye Highlights layer when switching materials.
+* Linked/exported Default Design using the native panel. Opened the exported PNG in installed Krita, made a visible erased marker, and saved with transparency. Exactly one import was logged; the marker appeared in VRoid's iris UV canvas without manual reimport.
+* A further save with unchanged pixel content produced no additional import. Switched VRoid to unlinked Eye Highlights, restored the iris pixels in Krita and saved again. The second changed-content import targeted the original iris path. Highlights stayed visually unchanged; switching back showed restored iris pixels.
+* Removed repetitive selection logging after verification. Final build differs from the interactive test only in that logging removal.
+
+Krita PNG save interoperability and single-link material switching are now exercised. The prior diagnostic separately verifies five imports, byte-level layer isolation and save/reopen persistence. Photoshop, two simultaneous UI links, deleted-layer behavior, full native undo/history behavior and systematic pointer-blocking checks remain pending. The panel is small at high DPI and still needs UI polish. No original model or installed VRoid binaries were edited.

@@ -35,7 +35,8 @@ public sealed class Plugin : BasePlugin
                 try
                 {
                     Bridge = new VRoid214Bridge(Log, Config.Bind("TextureSync", "Directory",
-                        Path.Combine(Paths.GameRootPath, "LinkTextureIL2CPP"), "Directory for exported PNG files.").Value);
+                        Path.Combine(Paths.GameRootPath, "LinkTextureIL2CPP"), "Directory for exported PNG files.").Value,
+                        Config.Bind("TextureSync", "ShowControlsOnStartup", true, "Show the texture control panel when the plugin loads.").Value);
                 }
                 catch (Exception error) { Log.LogError($"Texture bridge disabled: {error}"); }
             }
@@ -75,6 +76,7 @@ public sealed class BootstrapLifecycle : MonoBehaviour
     internal static int QuitAfterSeconds;
     private static readonly System.Diagnostics.Stopwatch elapsed = System.Diagnostics.Stopwatch.StartNew();
     private static bool tickLogged;
+    private static bool guiLogged;
 
     public void Update()
     {
@@ -89,5 +91,9 @@ public sealed class BootstrapLifecycle : MonoBehaviour
     }
 
     public void OnApplicationQuit() => Owner?.Stop();
-    public void OnGUI() => Owner?.Bridge?.OnGUI();
+    public void OnGUI()
+    {
+        if (!guiLogged) { guiLogged = true; Owner?.Log.LogInfo("Unity lifecycle OnGUI callback confirmed."); }
+        Owner?.Bridge?.OnGUI();
+    }
 }
