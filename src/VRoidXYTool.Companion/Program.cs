@@ -42,7 +42,8 @@ internal sealed class CompanionWindow : Window
     public CompanionWindow(string? initialStatePath)
     {
         Title = "VRoid Companion — Linked textures";
-        Width = 1060; Height = 640; MinWidth = 780; MinHeight = 460;
+        // Leave room for a preview row below the connection summary and above the actions.
+        Width = 1060; Height = 640; MinWidth = 780; MinHeight = 580;
         Background = Brush("#101620"); Foreground = Brushes.White; FontFamily = new FontFamily("Segoe UI");
         var root = new Grid { Margin = new Thickness(28) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });

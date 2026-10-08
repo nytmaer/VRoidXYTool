@@ -41,6 +41,15 @@ try
     Check(CompanionPreferences.Load(settings).UseDefaultEditor, "explicit default editor choice survives restart");
     File.WriteAllText(settings, "{partial"); Check(CompanionPreferences.Load(settings).EditorPath == null, "corrupt preferences recover to defaults");
     File.WriteAllText(settings, new string(' ', 16385)); Check(CompanionPreferences.Load(settings).BridgePath == null, "oversized preferences recover to defaults");
+    string cameraFile = Path.Combine(root, "camera.json");
+    var cameraPresets = new WorkspacePresets();
+    cameraPresets.Cameras[0] = new CameraPreset(new Point3(0, 1, 4), new Point3(0, 1, 0), true, .9f);
+    cameraPresets.Save(cameraFile);
+    Check(WorkspacePresets.Load(cameraFile).Cameras[0] == cameraPresets.Cameras[0], "camera view and projection persist");
+    cameraPresets.Cameras[0] = cameraPresets.Cameras[0]! with { Size = -1 };
+    Reject(() => cameraPresets.Save(cameraFile), "invalid camera values cannot overwrite presets");
+    Check(WorkspacePresets.Load(cameraFile).Cameras[0]!.Size == .9f, "failed save preserves previous valid view");
+    File.WriteAllText(cameraFile, "{\"SchemaVersion\":2}"); Reject(() => WorkspacePresets.Load(cameraFile), "unknown camera schema rejected");
 }
 finally { Directory.Delete(root, true); }
 

@@ -6,11 +6,13 @@ Extension Plugin for VRoid Studio
 
 ## Experimental IL2CPP live texture migration
 
-The `dev/il2cpp-migration` branch includes a working live PNG texture prototype for **VRoid Studio 2.14.0** with BepInEx 6 IL2CPP. The legacy camera, pose, guide and other tools have not been ported. This is a draft migration, not a replacement release for all original features.
+The `dev/il2cpp-migration` branch includes live PNG texture linking, edit-mode camera presets and viewport reference guides for **VRoid Studio 2.14.0** with BepInEx 6 IL2CPP. Pose, MMD, recording and other legacy tools remain unported. This is a draft migration, not a replacement release for all original features.
 
 See [installation and usage](docs/IL2CPP_INSTALLATION.md), [verified compatibility results](docs/COMPATIBILITY_RESULTS.md), and [architecture audit](docs/ARCHITECTURE_AUDIT.md). Original MIT attribution and legacy source are retained.
 
 The optional [second-monitor Companion](docs/COMPANION.md) shows linked layers and sync status and opens their PNGs in an external editor. This first Windows WPF slice uses a local bridge snapshot and requires .NET 10 Windows Desktop; installer work is deferred.
+
+[Camera presets and reference guides](docs/WORKSPACE_TOOLS.md) provide body/head views, four persistent camera slots, projection switching, and a PNG/grid overlay inside the active model viewport. They change the editing view without writing model content.
 
 ## Why is the plug-in unavailable after VRoid Studio 1.26.1?
 

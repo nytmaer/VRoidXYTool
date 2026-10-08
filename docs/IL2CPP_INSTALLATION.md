@@ -1,6 +1,6 @@
 # Experimental IL2CPP live texture installation
 
-Supported test target: Windows x64, VRoid Studio 2.14.0 (Unity 6000.0.62f1), BepInEx 6.0.0-be.788+5b766a3. Other VRoid versions disable the adapter. This branch ports live texture linking only; original camera, guide, pose and other tools remain legacy code.
+Supported test target: Windows x64, VRoid Studio 2.14.0 (Unity 6000.0.62f1), BepInEx 6.0.0-be.788+5b766a3. Other VRoid versions disable the adapter. This branch includes live texture linking and an edit-mode camera/reference slice; pose and other tools remain legacy code.
 
 1. Make a separate copy of the installed VRoid application and a disposable copy of your `.vroid`. Follow `IL2CPP_BOOTSTRAP.md` to install the pinned BepInEx IL2CPP runtime in that application copy. Do not combine the old BepInEx 5 installation with the new loader. The copied app still uses per-user settings and custom-item storage.
 2. Launch the copied app once to generate its `BepInEx/interop` assemblies, then close it. Build with a .NET SDK supporting net6.0:
@@ -15,6 +15,8 @@ Supported test target: Windows x64, VRoid Studio 2.14.0 (Unity 6000.0.62f1), Bep
 6. Opening/reopening a document clears links. Relink explicitly. **Unlink all** stops imports and leaves the PNG files intact. Reexport overwrites a linked PNG with current document pixels; preserve unsaved external edits first.
 
 Configuration: `BepInEx/config/io.github.nytmaer.vroidxytool.il2cpp.cfg`. `TextureSync.Enabled` disables/enables the adapter; `Directory` controls PNG export storage; `ShowControlsOnStartup` controls initial panel visibility. Leave `Diagnostics.ModelPath` blank and `QuitAfterSeconds=0` for normal use.
+
+The workspace panel also offers **Camera presets** and **Reference guides**. See [workspace tools](WORKSPACE_TOOLS.md) for saved views and clipboard-loaded PNG references. These tools require a model in edit mode and do not modify its content.
 
 The optional [second-monitor Companion](COMPANION.md) displays linked layers and opens their PNGs in an external editor. `Companion.StatePath` selects the local JSON snapshot (default `Companion/bridge-state.json` under the test application). The bridge keeps VRoid updating in the background while enabled so its heartbeat and texture imports continue when the Companion or editor has focus; unloading restores the original background setting. Installer work is deferred.
 

@@ -48,12 +48,15 @@ internal sealed class VRoid214Bridge : IDisposable
     private GUIStyle textStyle;
     private GUIStyle buttonStyle;
     private string status = "Open texture editing, select a raster layer, then link it.";
+    private readonly WorkspaceTools workspace;
+    private int tab;
 
     public VRoid214Bridge(ManualLogSource log, string directory, bool showOnStartup = true, string statePath = null)
     {
         this.log = log;
         this.directory = Path.GetFullPath(directory);
         this.statePath = statePath;
+        workspace = new WorkspaceTools(log, Path.Combine(BepInEx.Paths.ConfigPath, "VRoidXYToolWorkspace.json"), Path.Combine(BepInEx.Paths.GameRootPath, "Companion", "reference.png"));
         show = showOnStartup;
         active = this;
         try
@@ -121,6 +124,7 @@ internal sealed class VRoid214Bridge : IDisposable
         if (current?.Pointer == document?.Pointer) return;
         ClearLinks();
         document = current;
+        workspace.DocumentChanged();
         editor = null;
         session = current == null ? null : Guid.NewGuid().ToString("N");
         status = current == null ? "Open a model to link textures." : "Select a raster layer in texture editing.";
@@ -143,6 +147,7 @@ internal sealed class VRoid214Bridge : IDisposable
 
     public void OnGUI()
     {
+        if (!disposed) { try { workspace.DrawGuides(); } catch (Exception e) { Report(e); } }
         if (!show || disposed) return;
         // Explicit styles avoid changing VRoid's shared GUI skin and remain readable at high DPI.
         panelStyle ??= CopyStyle(GUI.skin.box, 20);
@@ -150,9 +155,15 @@ internal sealed class VRoid214Bridge : IDisposable
         buttonStyle ??= CopyStyle(GUI.skin.button, 18);
         var previousColor = GUI.color;
         GUI.color = new UnityEngine.Color(0.08f, 0.08f, 0.08f, 0.97f);
-        GUI.DrawTexture(new Rect(20, 20, 780, 260), Texture2D.whiteTexture);
+        float panelHeight = tab == 0 ? 310 : 490;
+        if (blocker != null) blocker.GetComponent<RectTransform>().sizeDelta = new Vector2(780, panelHeight);
+        GUI.DrawTexture(new Rect(20, 20, 780, panelHeight), Texture2D.whiteTexture);
         GUI.color = previousColor;
-        GUI.Box(new Rect(20, 20, 780, 260), "VRoidXYTool — Live Texture Sync (Tab to hide)", panelStyle);
+        GUI.Box(new Rect(20, 20, 780, panelHeight), "VRoidXYTool — Workspace (Tab to hide)", panelStyle);
+        string[] tabs = { "Textures", "Camera presets", "Reference guides" };
+        for (int i = 0; i < tabs.Length; i++) if (GUI.Button(new Rect(35 + i * 250, 55, 240, 36), tabs[i], buttonStyle)) tab = i;
+        if (tab != 0) { try { workspace.DrawControls(tab, textStyle, buttonStyle); } catch (Exception e) { Report(e); } return; }
+        GUI.BeginGroup(new Rect(0, 50, Screen.width, Screen.height));
         GUI.Label(new Rect(35, 55, 745, 55), status, textStyle);
         try
         {
@@ -177,6 +188,7 @@ internal sealed class VRoid214Bridge : IDisposable
             GUI.Label(new Rect(300, 210, 475, 52), "Save your .vroid to preserve imported edits.", textStyle);
         }
         catch (Exception error) { Report(error); }
+        GUI.EndGroup();
     }
 
     private LayerIdentity Identity(EditableImageRasterLayerPath path) => new(session,
@@ -328,6 +340,7 @@ internal sealed class VRoid214Bridge : IDisposable
         harmony.UnpatchSelf();
         if (blockerCanvas != null) UnityEngine.Object.Destroy(blockerCanvas);
         ClearLinks();
+        workspace.Dispose();
         PublishSnapshot(false);
         editor = null;
         document = null;
