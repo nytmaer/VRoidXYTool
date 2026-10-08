@@ -1,6 +1,6 @@
 # Live texture prototype — VRoid Studio 2.14.0
 
-Version 0.2.0 implements a bridge prototype. Hook installation is verified; document editing and persistence still require acceptance testing. Use a disposable copy of a model.
+Version 0.2.0 implements a bridge prototype. Document export, five external PNG saves, exact marker pixels, save/reopen persistence, old-link invalidation and unlinked-layer isolation have been verified on a disposable Song model in VRoid Studio 2.14.0. Interactive controls and layer/material switching still require acceptance testing. Use a disposable copy of a model.
 
 ## Installation in the isolated test copy
 
@@ -37,7 +37,7 @@ The panel includes a transparent uGUI raycast blocker to keep pointer input off 
 
 PNG files are limited to 64 MiB compressed and 4096 pixels on each axis before decode. The guard checks chunk bounds and IEND but does not replace the Unity image decoder or validate every PNG semantic rule. Missing, locked and incomplete files remain pending. Failed command/decode operations retry; warnings are limited to once per five seconds. Deleted layers fail the document query rather than being redirected to a selected replacement.
 
-The adapter is version-specific and uses generated private VRoid APIs. It hooks `TextureEditor.ViewModel.OnSelectedLayerUpdated`, not a constructor, to capture the active editor. Capturing the hook and opening a model are separate from successfully invoking generic queries and editing commands. There is no claim of working end-to-end synchronization until the checks below pass.
+The adapter is version-specific and uses generated private VRoid APIs. It hooks `TextureEditor.ViewModel.OnSelectedLayerUpdated`, not a constructor, to capture the active editor. The document diagnostic discovers layer paths through VRoid queries and invokes the same export/import implementation as the panel. It verifies the document-editing path; it does not exercise the panel's selected-layer capture or pointer handling.
 
 ## Acceptance checklist
 
@@ -52,3 +52,11 @@ Record the application version and BepInEx log for every run. Avoid posting acco
 - Open another model; edit the old PNG; verify no changes to the new model.
 - Save/reopen the disposable model; verify imported pixels persisted and relinking is explicit.
 - Quit normally; require shutdown logging and no lingering test process.
+
+## Opt-in document diagnostic
+
+Copy a model to `.local/test-models/`. Set `Diagnostics.ModelPath` to that copied `.vroid` path; the plugin rejects paths outside that directory. Leave `QuitAfterSeconds=0`. Run `scripts/Test-DocumentBridge.ps1 -Visible` after building. The script deploys both plugin DLLs and opens only the isolated application. A visible window is necessary for these VRoid document tests; hidden launches stalled frame progress, while VRoid's batch-mode deep-link handler exits before the test.
+
+The diagnostic opens the copy, discovers two raster layers, exports one and prepares PNG fixtures. The separate PowerShell process performs five external saves. After each import the diagnostic checks the changed marker color and the second layer's unchanged pixel hash. It saves/reopens the copy, compares the saved raster hash, then changes the previous PNG and checks that the old link is inactive. On success it quits normally and writes `diagnostic/result.txt`. The driver fails if the process times out or the result is not PASS.
+
+This test intentionally changes a corner pixel and saves the disposable project. It never targets the original model. Clear `Diagnostics.ModelPath` after testing to disable it. Account-bearing player logs and the model/PNG fixtures stay under `.local/` and are not committed.

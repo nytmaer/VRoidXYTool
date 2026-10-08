@@ -89,7 +89,7 @@ internal sealed class VRoid214Bridge : IDisposable
 
     private void RefreshDocument()
     {
-        var avatar = UnityEngine.Object.FindObjectOfType<AvatarEditor>();
+        var avatar = FindAvatar();
         var current = avatar == null ? null : avatar._viewModel?.CurrentFile?.model;
         if (current?.Pointer == document?.Pointer) return;
         ClearLinks();
@@ -98,6 +98,13 @@ internal sealed class VRoid214Bridge : IDisposable
         session = current == null ? null : Guid.NewGuid().ToString("N");
         status = current == null ? "Open a model to link textures." : "Select a raster layer in texture editing.";
         log.LogInfo("Document changed; previous texture links invalidated.");
+    }
+
+    internal static AvatarEditor FindAvatar()
+    {
+        foreach (var candidate in UnityEngine.Object.FindObjectsOfType<AvatarEditor>(true))
+            if (candidate != null && candidate._viewModel != null) return candidate;
+        return null;
     }
 
     private bool HasCurrentLayer(out RasterLayerViewModel layer)
@@ -138,9 +145,13 @@ internal sealed class VRoid214Bridge : IDisposable
     {
         RefreshDocument();
         if (!HasCurrentLayer(out var current) || current.Pointer != layer.Pointer) return;
+        ExportPath(layer.Path, layer.TranslatedDisplayName);
+    }
+
+    internal string ExportPath(EditableImageRasterLayerPath path, string label)
+    {
         var context = document.engine.Context;
-        if (!context.IsQueryExecutable || !context.IsCommandExecutable) return;
-        var path = layer.Path;
+        if (!context.IsQueryExecutable || !context.IsCommandExecutable) return null;
         var identity = Identity(path);
         var result = context.ExecuteSyncQuery<GetRasterLayerContentQuery.Result>(
             new GetRasterLayerContentQuery(path).Cast<ISyncQuery<GetRasterLayerContentQuery.Result>>());
@@ -161,8 +172,9 @@ internal sealed class VRoid214Bridge : IDisposable
             ownsBackgroundSetting = true;
         }
         Application.runInBackground = true;
-        status = "Linked " + layer.TranslatedDisplayName + ". PNG path is in BepInEx/LogOutput.log.";
+        status = "Linked " + label + ". PNG path is in BepInEx/LogOutput.log.";
         log.LogInfo($"Linked raster layer {identity.Texture}/{identity.Layer}: {filePath}");
+        return filePath;
     }
 
     private bool Import(LinkedLayer link, byte[] bytes)

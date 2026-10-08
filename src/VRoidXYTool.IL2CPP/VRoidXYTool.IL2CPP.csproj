@@ -11,7 +11,7 @@
     <Reference Include="BepInEx.Core" HintPath="$(BepInExRoot)/core/BepInEx.Core.dll" Private="false" />
     <Reference Include="BepInEx.Unity.IL2CPP" HintPath="$(BepInExRoot)/core/BepInEx.Unity.IL2CPP.dll" Private="false" />
     <Reference Include="Il2CppInterop.Runtime" HintPath="$(BepInExRoot)/core/Il2CppInterop.Runtime.dll" Private="false" />
-    <Reference Include="Il2Cppmscorlib" HintPath="$(InteropRoot)/Il2Cppmscorlib.dll" Private="false" Aliases="il2cpp" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(InteropRoot)/Il2Cppmscorlib.dll" Private="false" Aliases="global,il2cpp" />
     <Reference Include="UnityEngine.CoreModule" HintPath="$(InteropRoot)/UnityEngine.CoreModule.dll" Private="false" />
     <Reference Include="0Harmony" HintPath="$(BepInExRoot)/core/0Harmony.dll" Private="false" />
     <Reference Include="UnityEngine.IMGUIModule" HintPath="$(InteropRoot)/UnityEngine.IMGUIModule.dll" Private="false" />

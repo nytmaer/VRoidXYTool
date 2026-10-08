@@ -1,6 +1,6 @@
 # Sprint 001 compatibility results
 
-Test date: October 7–8, 2026 (America/Indianapolis). Sprint is **incomplete**: external edits have not yet been applied to a VRoid document.
+Test dates: October 7–8, 2026 (America/Indianapolis). **Core synchronization now passes document integration tests**: five external PNG saves update a raster layer and persist after save/reopen. Interactive selected-layer controls and material/layer switching still require acceptance checks. The earlier bootstrap/prototype findings below are historical; see the Song diagnostic section for current results.
 
 ## Environment and execution
 
@@ -51,11 +51,11 @@ These are confirmed wrapper signatures, not verified invocations or usable Harmo
 | Registered Unity lifecycle component | Pass |
 | Normal shutdown hook and exit | Pass in batch mode; interactive quit untested |
 | File core tests | Pass |
-| Layer capture / export inside editor | Implemented in 0.2.0; document test pending |
-| External PNG applies without manual import | Implemented in 0.2.0; document test pending |
-| Repeated saves inside editor | Untested |
+| Layer export from loaded document | Pass through document query; selected-layer UI capture untested |
+| External PNG applies without manual import | Pass, five saves by a separate PowerShell process |
+| Repeated saves inside editor | Pass, exact corner marker verified after each save |
 | Layer/material/document switching | Untested |
-| Save/reopen persistence | Untested |
+| Save/reopen persistence | Pass, complete raster-byte hash unchanged after reopen |
 | Runtime plugin Unload | Implemented, not exercised |
 
 Commands:
@@ -84,4 +84,32 @@ Added the version-gated bridge, selected-layer controls, document-session link i
 
 Final tested build (PID 320808) loaded `VRoidXYTool Live Texture Prototype 0.2.0`, logged `VRoid 2.14 texture selection hook installed`, completed chainloader startup and logged normal shutdown with exit code 0. This verifies hook installation and blocker construction in batch mode, not invocation of the hook with a selected layer, interactive input blocking or PNG import. The existing Class::Init fallback warning remains.
 
-The expanded file-core harness passed a real 1x1 PNG fixture, rejection of every truncated prefix, excessive dimensions, trailing bytes and non-PNG data, plus all previous file synchronization regressions. Final release build has zero warnings/errors. PNG semantic decoding still belongs to Unity's decoder. See `LIVE_TEXTURE_PROTOTYPE.md` for the interactive acceptance checklist. A disposable model path has been requested for document tests.
+The expanded file-core harness passed a real 1x1 PNG fixture, rejection of every truncated prefix, excessive dimensions, trailing bytes and non-PNG data, plus all previous file synchronization regressions. Final release build has zero warnings/errors. PNG semantic decoding still belongs to Unity's decoder. See `LIVE_TEXTURE_PROTOTYPE.md` for the interactive acceptance checklist.
+
+## Song document diagnostic — October 8, 2026
+
+The user supplied a Song `.vroid` source. Copied it to `.local/test-models/Song-test.vroid` (5,942,443 bytes at baseline). Source SHA256 before and after testing: `E932FB79966C243F3373CA6E0615151DA4E1817FE920D674369A60CC673C2CC1`. The original was never opened or saved by VRoid during this test. Only the local copy was changed and saved; no model or PNG files are committed.
+
+The diagnostic is opt-in through `Diagnostics.ModelPath` and rejects paths outside `.local/test-models`. It calls MainActionHandler.Open on the copy, enumerates editable-image/raster-layer queries, then invokes the same bridge ExportPath and SettledFileLink/Import methods as the interactive controls. It requires a second layer for its isolation assertions. `scripts/Test-DocumentBridge.ps1 -Visible` writes candidate PNGs from a separate process into the exported file; no manual reimport action is used. Fixtures modify only a corner marker pixel. Exact marker colors are checked after each import, not merely a changed hash.
+
+Verified on VRoid Studio 2.14.0 / Unity 6000.0.62f1:
+
+* Loaded the disposable Song project and exported a real raster layer through the document query.
+* Five successive external PNG saves imported automatically. Each imported marker matched the fixture; another raster layer's complete byte hash stayed unchanged.
+* SaveSync saved only the disposable model. Open reloaded it, and the imported raster-byte hash matched the saved content.
+* A sixth external save to the previous PNG did not alter the reopened document. Document replacement had cleared the old link.
+* Unity OnApplicationQuit removed the hook and links, logged shutdown and exited with code 0.
+* Release build and file-core regression harness passed. The original source hash remained unchanged.
+
+Result text:
+
+```text
+PASS: export, five externally saved PNG imports with marker verification,
+save/reopen pixel persistence, old-link invalidation, unlinked-layer isolation.
+```
+
+Runtime issues found and fixed: IL2CPP callback wrappers did not reliably expose the initially assigned managed instance callback state; lifecycle owner/diagnostic state is now shared explicitly through static fields and callback logging confirms Update execution. Editor discovery includes inactive objects, which are needed before entering the editor screen. The native core-library reference is available through global and il2cpp aliases; the local CLR NullableAttribute shim prevents stripped-attribute compilation errors.
+
+Earlier batch tests verified startup and OnApplicationQuit only. Player logs reveal that VRoid's DeepLinkReceiver automatically quits batch mode, so those runs did **not** validate the QuitAfterSeconds timer or a loaded document. Hidden-window document launches did not progress reliably; visible tests did. Final document tests use visible normal-mode windows and finish through the diagnostic's normal Application.Quit. The Class::Init fallback warning remains, but the tested generic queries and import command execute successfully.
+
+Remaining limits: the diagnostic bypasses the panel's selected-layer capture; Tab controls, pointer blocking, active UI layer/material switching, undo behavior and Photoshop/Krita-specific save behavior have not been exercised. File locks/rename/truncation are covered by the core harness rather than application-level editor saves. Existing links are intentionally not restored after reopening; imported project content persists. Full user-facing acceptance remains pending these checks.

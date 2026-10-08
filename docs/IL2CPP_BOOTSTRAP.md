@@ -1,6 +1,6 @@
 # IL2CPP bootstrap
 
-Version 0.2.0 adds an experimental VRoid 2.14.0 live-texture bridge. See `LIVE_TEXTURE_PROTOTYPE.md` for usage and `COMPATIBILITY_RESULTS.md` for actual test results. End-to-end document editing is not yet verified.
+Version 0.2.0 adds an experimental VRoid 2.14.0 live-texture bridge. The document diagnostic verifies live file imports and save/reopen persistence. See `LIVE_TEXTURE_PROTOTYPE.md` for usage and `COMPATIBILITY_RESULTS.md` for remaining interactive acceptance checks.
 
 ## Target and dependency pin
 
@@ -38,7 +38,7 @@ Inspect the generated VRoid assemblies for RasterLayerViewModel, current documen
 
 `src/VRoidXYTool.SyncCore` implements explicit file links keyed by document/texture/layer identity. Poll it on the Unity thread with monotonic elapsed time. It uses exclusive bounded reads, stable content hashes over a quiet period, retry after failed imports, and export acknowledgements. No FileSystemWatcher is required, so rename-based saves and missed watcher events are covered by polling. This reads/hashes the file per poll: tune intervals and profile before scaling to many large textures.
 
-The bridge callback verifies document session and layer identity, resolves the stored layer through a document query, preflights PNG bounds/completeness, decodes it and executes the document edit command. The core deliberately does not claim that stable bytes imply a complete valid PNG. Links are disposed on document change/shutdown. It is connected in version 0.2.0; actual layer export/import and persistence remain to be tested.
+The bridge callback verifies document session and layer identity, resolves the stored layer through a document query, preflights PNG bounds/completeness, decodes it and executes the document edit command. The core deliberately does not claim that stable bytes imply a complete valid PNG. Links are disposed on document change/shutdown. Actual export, repeated imports and persistence have passed the opt-in Song document diagnostic.
 
 ```powershell
 dotnet run --project tests/VRoidXYTool.SyncCore.Tests -c Release -p:NuGetAudit=false

@@ -14,15 +14,19 @@ public sealed class Plugin : BasePlugin
     private bool stopped;
     private BootstrapLifecycle lifecycle;
     internal VRoid214Bridge Bridge;
+    internal DocumentDiagnostic Diagnostic;
 
     public override void Load()
     {
         stopped = false;
         lifecycle = AddComponent<BootstrapLifecycle>();
-        lifecycle.Owner = this;
-        lifecycle.QuitAfterSeconds = Config.Bind("Diagnostics", "QuitAfterSeconds", 0,
+        BootstrapLifecycle.Owner = this;
+        BootstrapLifecycle.QuitAfterSeconds = Config.Bind("Diagnostics", "QuitAfterSeconds", 0,
             "Test-only automatic normal application exit; 0 disables it.").Value;
-        if (lifecycle.QuitAfterSeconds > 0) Application.runInBackground = true;
+        if (BootstrapLifecycle.QuitAfterSeconds > 0) Application.runInBackground = true;
+        lifecycle.enabled = true;
+        lifecycle.gameObject.SetActive(true);
+        Log.LogInfo($"Lifecycle component active={lifecycle.gameObject.activeInHierarchy}, enabled={lifecycle.enabled}.");
         Log.LogInfo($"Bootstrap initialized; CLR {Environment.Version}; process {Environment.ProcessId}.");
         if (Config.Bind("TextureSync", "Enabled", true, "Enable the experimental VRoid 2.14.0 texture bridge.").Value)
         {
@@ -36,6 +40,12 @@ public sealed class Plugin : BasePlugin
                 catch (Exception error) { Log.LogError($"Texture bridge disabled: {error}"); }
             }
             else Log.LogWarning($"Texture bridge requires VRoid 2.14.0; detected {Application.version}.");
+        }
+        string diagnosticPath = Config.Bind("Diagnostics", "ModelPath", "", "Opt-in disposable document test; only .local/test-models paths accepted.").Value;
+        if (Bridge != null && !string.IsNullOrWhiteSpace(diagnosticPath))
+        {
+            try { Diagnostic = new DocumentDiagnostic(this, Log, diagnosticPath); Application.runInBackground = true; }
+            catch (Exception error) { Log.LogError(error); }
         }
     }
 
@@ -52,6 +62,8 @@ public sealed class Plugin : BasePlugin
         stopped = true;
         Bridge?.Dispose();
         Bridge = null;
+        Diagnostic = null;
+        if (BootstrapLifecycle.Owner == this) BootstrapLifecycle.Owner = null;
         Log.LogInfo("Bootstrap shutdown completed.");
     }
 }
@@ -59,13 +71,16 @@ public sealed class Plugin : BasePlugin
 public sealed class BootstrapLifecycle : MonoBehaviour
 {
     public BootstrapLifecycle(IntPtr pointer) : base(pointer) { }
-    internal Plugin Owner;
-    internal int QuitAfterSeconds;
-    private readonly System.Diagnostics.Stopwatch elapsed = System.Diagnostics.Stopwatch.StartNew();
+    internal static Plugin Owner;
+    internal static int QuitAfterSeconds;
+    private static readonly System.Diagnostics.Stopwatch elapsed = System.Diagnostics.Stopwatch.StartNew();
+    private static bool tickLogged;
 
     public void Update()
     {
+        if (!tickLogged) { tickLogged = true; Owner?.Log.LogInfo("Unity lifecycle Update callback confirmed."); }
         Owner?.Bridge?.Update();
+        Owner?.Diagnostic?.Update();
         if (QuitAfterSeconds > 0 && elapsed.Elapsed.TotalSeconds >= QuitAfterSeconds)
         {
             QuitAfterSeconds = 0;

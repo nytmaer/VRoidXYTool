@@ -1,6 +1,6 @@
 # Sprint 001: IL2CPP Migration Audit
 
-Status: **Source audit and IL2CPP bootstrap implemented. Bootstrap startup and batch-mode normal shutdown verified on VRoid Studio 2.14.0; live texture integration and persistence remain unverified.**
+Status: **Live PNG synchronization verified on a disposable Song project in VRoid Studio 2.14.0: five external file saves, exact marker pixels, save/reopen persistence, old-link invalidation and unlinked-layer isolation. Interactive control and layer/material-switching acceptance checks remain pending.**
 
 Implementation details: [architecture audit](ARCHITECTURE_AUDIT.md), [bootstrap setup](IL2CPP_BOOTSTRAP.md), and [compatibility results](COMPATIBILITY_RESULTS.md).
 
