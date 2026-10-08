@@ -164,3 +164,11 @@ The user deferred installer work and selected a second-monitor window listing li
 * Original `Song.vroid` SHA256 is still `E932FB79966C243F3373CA6E0615151DA4E1817FE920D674369A60CC673C2CC1`. No source model, personal assets, application binaries or generated interop are included in the change.
 
 The UI check used one monitor; actual multi-monitor placement, varied DPI, alternate chosen editor and default PNG association remain unverified. The Companion requires .NET 10 Windows Desktop, stores no editor preference, and includes no installer, thumbnails or native document editing controls. CI now runs both independent harnesses and compiles the WPF app; native bridge acceptance remains local.
+
+## Companion polish — October 8, 2026
+
+Added live PNG thumbnails, remembered bridge/editor choices, an explicit **Use default app** preference, full-path tooltips, compact filename columns, wrapping action buttons, an empty-state message and readable selected/hovered rows. Preferences are stored atomically in the user's LocalAppData; missing, corrupt and oversized settings recover to defaults. Thumbnail reads use shared streams and eager bounded decoding, then release files immediately. Cached images refresh when file timestamp or size changes; removed links are evicted.
+
+The final Release build passed with zero warnings/errors. The Companion contract harness passed its existing guards plus preference roundtrip, explicit default-editor persistence and missing/corrupt/oversized recovery checks. In the native UI, an iris thumbnail appeared, a temporary cyan PNG fixture changed the preview while preserving selection, and restoring the original PNG restored the preview. Both native imports were observed. A deliberately truncated 24-byte PNG produced Import deferred and a blank preview without closing the Companion; restoring the original recovered normally. The preview baseline is restored.
+
+Restarting the Companion reconnected to the remembered live bridge and restored the explicit default-app choice. Choosing installed Krita and restarting again restored Krita. Selected and hovered row text is readable on the light highlight. The Companion is left open with the restored iris link on the disposable Song model. Actual multi-monitor placement, varied DPI and other editor launches remain unverified; installer work is still deferred.

@@ -32,6 +32,15 @@ try
     File.WriteAllText(state, "{\"SchemaVersion\":1,\"Layers\":[null]}"); Reject(() => SnapshotFile.Read(state), "null layer entries rejected");
     File.WriteAllText(state, new string(' ', 1024 * 1024 + 1)); Reject(() => SnapshotFile.Read(state), "oversized state rejected");
     Console.WriteLine("PASS: all Companion contract regressions");
+    string settings = Path.Combine(root, "preferences", "settings.json");
+    Check(CompanionPreferences.Load(settings).BridgePath == null, "missing preferences use defaults");
+    new CompanionPreferences { BridgePath = state, EditorPath = "C:/editor path/editor.exe" }.Save(settings);
+    var preferences = CompanionPreferences.Load(settings);
+    Check(preferences.BridgePath == state && preferences.EditorPath == "C:/editor path/editor.exe", "bridge and editor preferences survive restart");
+    new CompanionPreferences { BridgePath = state, UseDefaultEditor = true }.Save(settings);
+    Check(CompanionPreferences.Load(settings).UseDefaultEditor, "explicit default editor choice survives restart");
+    File.WriteAllText(settings, "{partial"); Check(CompanionPreferences.Load(settings).EditorPath == null, "corrupt preferences recover to defaults");
+    File.WriteAllText(settings, new string(' ', 16385)); Check(CompanionPreferences.Load(settings).BridgePath == null, "oversized preferences recover to defaults");
 }
 finally { Directory.Delete(root, true); }
 
