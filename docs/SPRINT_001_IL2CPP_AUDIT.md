@@ -1,6 +1,8 @@
 # Sprint 001: IL2CPP Migration Audit
 
-Status: **Investigation started; runtime compatibility unverified.**
+Status: **Source audit and IL2CPP bootstrap implemented. Bootstrap startup and batch-mode normal shutdown verified on VRoid Studio 2.14.0; live texture integration and persistence remain unverified.**
+
+Implementation details: [architecture audit](ARCHITECTURE_AUDIT.md), [bootstrap setup](IL2CPP_BOOTSTRAP.md), and [compatibility results](COMPATIBILITY_RESULTS.md).
 
 ## Confirmed from upstream README
 - VRoid Studio 1.26.1 changed its scripting backend from Mono to IL2CPP, invalidating the original plugin integration.
