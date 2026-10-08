@@ -1,6 +1,6 @@
 # Sprint 001: IL2CPP Migration Audit
 
-Status: **Live PNG synchronization verified on a disposable Song project in VRoid Studio 2.14.0: five external file saves, exact marker pixels, save/reopen persistence, old-link invalidation and unlinked-layer isolation. Interactive control and layer/material-switching acceptance checks remain pending.**
+Status: **Sprint 001 complete for the documented VRoid Studio 2.14.0 target. Live PNG synchronization, six diagnostic imports, two simultaneous links, invalid PNG recovery, native undo/redo, save/reopen persistence, old-link invalidation and deleted-layer isolation passed. Native panel/Krita tests, two-layer UI linking, material switching and representative pointer-blocking checks also passed. Photoshop-specific and broader screen/version coverage remain unverified.**
 
 Implementation details: [architecture audit](ARCHITECTURE_AUDIT.md), [bootstrap setup](IL2CPP_BOOTSTRAP.md), and [compatibility results](COMPATIBILITY_RESULTS.md).
 
@@ -33,4 +33,4 @@ Implementation details: [architecture audit](ARCHITECTURE_AUDIT.md), [bootstrap 
 - Can the selected texture be updated without destabilizing VRoid's undo/history and save systems?
 - Can the plugin safely exchange files or commands with a separate second-monitor companion?
 
-This document is an audit checklist, not a claim that the plugin has been ported.
+This document records the completed live-texture migration scope. Other legacy features have not been ported. Exact runtime evidence and limitations are recorded in COMPATIBILITY_RESULTS.md; the implementation remains on the migration branch with main unchanged.
