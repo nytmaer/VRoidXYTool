@@ -1,68 +1,81 @@
-# VRoidXYTool
+# VRoidXYTool — IL2CPP port for VRoid Studio 2.14
 
-[English Readme](README_English.md)
+A port of [xiaoye97/VRoidXYTool](https://github.com/xiaoye97/VRoidXYTool) to current VRoid Studio.
 
-用于VRoidStudio的扩展插件
+The original plugin stopped working when VRoid Studio 1.26.1 switched from Mono to IL2CPP. This fork rebuilds its core workflow, live texture linking, for **VRoid Studio 2.14.0** on **BepInEx 6 (IL2CPP)**. It also adds a second-monitor Companion and edit-mode camera and reference tools.
 
-## 免费声明
-本插件为完全免费插件，禁止任何形式的售卖，近日看到有淘宝无良卖家在贩卖VRoidStudio软件本体和汉化插件，请大家注意警惕，如果看到请帮忙举报一下，谢谢。
+> **Credit.** VRoidXYTool was created by 宵夜 (xiaoye97) and released under the MIT license. The original source, license and attribution are kept in this repository. For the original plugin and its Chinese documentation, see the [upstream repository](https://github.com/xiaoye97/VRoidXYTool). 原版插件及中文说明请见[上游仓库](https://github.com/xiaoye97/VRoidXYTool)。
 
-## 为什么在VRoid Studio 1.26.1版本之后用不了了？
-从1.26.1版本开始, VroidStudio从mono切换到了il2cpp, 所有的插件都失效了. 并且因为il2cpp的插件开发较为麻烦并且本人最近也没有什么时间. 所以, 如果你想继续使用插件, 可以先从官网下载1.26.0版本后安装插件. 或者在QQ交流群684544577下载1.26.0带插件版本整合包.
+This plugin is free. It must not be sold in any form.
 
-## 为什么在VRoid Studio 1.18版本之后用不了了？
-因为此版本的更新导致出现了一点问题，只需要改动一个设置即可。
-打开VRoid Studio\BepInEx\config\BepInEx.cfg文件，将`HideManagerGameObject = false`修改为`HideManagerGameObject = true`，然后重启软件即可。
+## Status
 
-## 下载
-[最新版本][4]
+**Experimental.** It works on the tested setup below, but no release binaries are published yet. You build it yourself, and you should test on copies of the app and your models.
 
-## 简介
+| Feature | Status |
+| --- | --- |
+| Live texture linking | Ported. Link raster layers, edit the PNGs in Krita or another editor, and saves sync into VRoid automatically |
+| Camera presets | Ported (edit mode). Body and head views, perspective/orthographic, four saved slots |
+| Reference guides | Ported (edit mode). PNG overlay and alignment grid inside the model viewport |
+| Second-monitor Companion | New. A separate window listing linked layers with live thumbnails and sync status |
+| Pose presets, MMD/VMD player, video recording, anti-aliasing, wireframe | Not ported. Legacy source is kept under `VRoidXYTool/` |
 
-- 基于[BeplnEx][1]
-- 链接纹理功能，通过外部绘图工具(PS/SAI等)对纹理进行处理，并实时同步到VRoid Studio内
-- 镜头位置预设，快速定位到全身和脸部的四方向视角，可选透视或正交模式，支持自定义位置
-- 参考工具，可以添加标尺和参考图
-- 姿势预设，可以在摄影棚中的姿势模式中，保存和加载自定义的姿势预设
-- 抗锯齿，除了在摄影棚中可以抗锯齿之外，在编辑模式下也可以开启抗锯齿
-- MMD播放器(实验性)，可以在摄影棚中导入VMD动画文件进行播放
-- 视频录制，在VRoid内进行视频录制高清视频
-- 线框模式，用于观察模型的布线
+### What changed from the original
 
-![图示](https://cdn.jsdelivr.net/gh/xiaoye97/VRoidXYTool@master/LinkTexturePreview.gif)
+- **New runtime.** It is rebuilt as a BepInEx 6 IL2CPP plugin (`src/VRoidXYTool.IL2CPP`) against VRoid 2.14's generated interop APIs. The legacy Mono plugin can't load on any VRoid version after 1.26.0.
+- **Safer texture sync.** Links are tied to the document and the specific layer, so edits go only to the layer you linked, even after you select another layer or open a different model. Saves are applied only after the file stops changing and passes a PNG check. A truncated or half-written save is ignored until a valid one arrives. Imports go through VRoid's own undo/redo. Opening a different model clears all links.
+- **Multiple layers.** You can link several layers at once and switch materials while editing.
+- **Companion app.** A Windows window for a second monitor. It shows each linked layer, a thumbnail, sync status and last import time, and opens the PNG in your editor in one click.
+- **Workspace tools.** Camera presets and reference guides change only the editing view; they never modify your model.
 
-![图示](MMDPreview.gif)
+## Requirements
 
-![图示](WireframePreview.png)
+- Windows x64
+- VRoid Studio **2.14.0**. On any other version, the plugin disables itself.
+- [BepInEx 6.0.0-be.788 (Unity IL2CPP, win-x64)](https://builds.bepinex.dev/projects/bepinex_be/788/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.788%2B5b766a3.zip). Don't install it over an old BepInEx 5 setup.
+- .NET SDK with .NET 6 targeting packs to build the plugin
+- .NET 10 Windows Desktop runtime, for the Companion only
 
-## 教程
+## Install and use
 
-- 视频教程见[B站][2]
+**Work on a copy of the VRoid app and a copy of your `.vroid` file.** The plugin edits documents through VRoid's internal APIs, and only the tested setup is verified.
 
-## Q&A
+1. Install BepInEx 6 into the copied app (see [bootstrap setup](docs/IL2CPP_BOOTSTRAP.md)). Launch it once to generate `BepInEx/interop`, then close it.
+2. Build the plugin:
 
-`Q:` 我没有BepInEx文件夹怎么办？
+   ```powershell
+   dotnet build src/VRoidXYTool.IL2CPP -c Release -p:BepInExRoot="C:/your-test-app/BepInEx" -p:InteropRoot="C:/your-test-app/BepInEx/interop"
+   ```
 
-`A:` 到BepInEx仓库下载releases进行安装，或者安装VRoid[汉化插件][3]，汉化插件的安装包内附带了BepInEx
+3. Copy `VRoidXYTool.IL2CPP.dll`, `VRoidXYTool.SyncCore.dll` and `VRoidXYTool.CompanionCore.dll` from `src/VRoidXYTool.IL2CPP/bin/Release/net6.0/` to `BepInEx/plugins/VRoidXYTool.IL2CPP/`.
+4. Open your model, enter texture editing, select a raster layer and click **Link / export selected**.
+5. Click **Copy linked PNG path**, open the file in your editor, and save as PNG. The change appears in VRoid automatically.
+6. Save the `.vroid` normally. Saving the PNG alone doesn't save your model.
 
-`Q:` 我安装了插件，在软件内怎么打开？
+**Tab** shows or hides the panel. Settings are in `BepInEx/config/io.github.nytmaer.vroidxytool.il2cpp.cfg`.
 
-`A:` 默认开启快捷键为Tab，可以在配置文件中修改
+Full details:
+- [Installation and usage](docs/IL2CPP_INSTALLATION.md)
+- [Second-monitor Companion](docs/COMPANION.md)
+- [Camera presets and reference guides](docs/WORKSPACE_TOOLS.md)
 
-`Q:` 链接纹理怎么用？
+## Known limits
 
-`A:` 在软件内编辑任意纹理，都会在插件中显示当前编辑的纹理，然后点击导出纹理，然后用外部绘图工具打开导出的纹理进行修改，修改之后，保存就可以同步到软件内。
+- Tested only on VRoid Studio 2.14.0 with Krita, on one Windows two-monitor setup. Photoshop saves and other monitor/DPI arrangements are not yet verified.
+- PNGs are limited to 4096×4096 and 64 MiB.
+- Camera and reference tools work in edit mode only, not the photo booth.
+- No installer or prebuilt download yet.
 
-`Q:` 链接纹理默认的文件夹在软件安装目录，我想换个目录怎么办？
+Test evidence is recorded in [compatibility results](docs/COMPATIBILITY_RESULTS.md), and the migration design in the [architecture audit](docs/ARCHITECTURE_AUDIT.md).
 
-`A:` 修改配置文件，可以自定义链接目录，链接目录的配置留空则为默认路径
+## Legacy plugin (VRoid Studio 1.26.0 and earlier)
 
-`Q:` 我遇到了bug或者有功能建议怎么反馈？
+The original Mono plugin's source is kept in `VRoidXYTool/` for reference. To use the original plugin with its full feature set, install VRoid Studio 1.26.0 and follow the [upstream instructions](https://github.com/xiaoye97/VRoidXYTool).
 
-`A:` bug提交Issues或到VRoid交流群(684544577)或者我的私人小群(528385469)内找我，提建议到群内找我
+## Feedback
 
+Report bugs and suggestions in [GitHub Issues](https://github.com/nytmaer/VRoidXYTool/issues). Please don't post BepInEx or player logs publicly without removing account information first.
 
-[1]: https://github.com/BepInEx/BepInEx/releases
-[2]: https://www.bilibili.com/video/BV1TP4y1V7Qn/
-[3]: https://www.bilibili.com/video/BV1BL41137Tc/
-[4]: https://github.com/xiaoye97/VRoidXYTool/releases
+## License
+
+MIT, © 2021 宵夜 (xiaoye97). See [LICENSE](LICENSE). The IL2CPP port and Companion are released under the same license.
