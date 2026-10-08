@@ -139,3 +139,15 @@ Added an installation guide and Windows GitHub Actions coverage for the dependen
 Remaining limits are Photoshop-specific saves, full two-layer UI workflows and broad screen-size/version coverage. Native document undo/redo is verified; every possible UI history interaction is not certified. Copying VRoid isolates binaries but shares per-user custom-item/preferences storage. Original Song source SHA256 remains unchanged.
 
 Final candidate: normal-mode PID 347052, plugin DLL SHA256 `49F610F435C5E6BED02F5E8E51B2C52D3CB2215619A19D29E05CEF9C43A96DF8`. The final driver returned PASS and exit code 0, including a distinct seventh marker for the old-link and deleted-layer checks. Release build had zero warnings/errors; all file-core regressions and `git diff --check` passed. Diagnostic configuration is reset to disabled after testing.
+
+## Recovered Computer Use acceptance — October 8, 2026
+
+After resetting the Computer Use session, the isolated app appeared after the launch timeout and could be controlled normally. The following native UI checks now supersede the earlier pending two-layer/pointer checks:
+
+* At the home screen, clicking the disabled panel copy button over the underlying Create New card did not open a model dialog.
+* With Irises selected, clicking the covered Eye Highlights selector while the panel was visible did not switch material. Hiding the panel and clicking the same selector did switch to Eye Highlights.
+* Linked Default Design (Irises) through the panel, switched to Eye Highlights, and linked its Layer through the panel. The displayed link count was two, with distinct structural paths and PNG filenames.
+* An external PowerShell PNG fixture save put a cyan marker in the iris file and a green marker in the highlights file. Both imports were logged. The native highlights UV canvas showed only green; switching to Irises showed only cyan. These saves test external file replacement, not a second Krita session.
+* Restored both exported baselines; both restoration imports were logged and the iris marker disappeared. Clicking Unlink all showed zero links and disabled Copy linked PNG path.
+
+The isolated app is left open on the disposable Song test project with all links cleared. Original source assets remain untouched. Full-screen-size coverage and Photoshop-specific saves remain unverified; the native two-layer workflow and representative pointer-blocking checks are now exercised. GitHub PR workflow for code commit 78fa93b completed successfully.
