@@ -18,6 +18,16 @@ bool Apply(LayerIdentity actual, byte[] data)
 bool Poll(int ms, Func<LayerIdentity, byte[], bool>? apply = null) => link.Poll(TimeSpan.FromMilliseconds(ms), apply ?? Apply);
 try
 {
+    byte[] png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aOioAAAAASUVORK5CYII=");
+    Check(PngGuard.IsCompleteBoundedPng(png), "complete PNG accepted for decoder");
+    for (int length = 0; length < png.Length; length++)
+        if (PngGuard.IsCompleteBoundedPng(png.AsSpan(0, length))) throw new Exception("Truncated PNG accepted");
+    Check(true, "all truncated PNG saves rejected");
+    var hugePng = (byte[])png.Clone();
+    System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(hugePng.AsSpan(16), 4097);
+    Check(!PngGuard.IsCompleteBoundedPng(hugePng), "oversized PNG dimensions rejected before allocation");
+    Check(!PngGuard.IsCompleteBoundedPng(png.Concat(new byte[] { 0 }).ToArray()), "trailing partial data rejected");
+    Check(!PngGuard.IsCompleteBoundedPng(new byte[50]), "non-PNG data rejected");
     Check(!Poll(0) && calls == 0, "export does not import itself");
     var timestamp = File.GetLastWriteTimeUtc(path);
     File.WriteAllBytes(path, new byte[] { 4, 5, 6 });

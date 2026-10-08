@@ -1,6 +1,6 @@
 # IL2CPP bootstrap
 
-This plugin is a logging-only migration starting point. It does not yet restore linked texture editing. See `COMPATIBILITY_RESULTS.md` for actual test results.
+Version 0.2.0 adds an experimental VRoid 2.14.0 live-texture bridge. See `LIVE_TEXTURE_PROTOTYPE.md` for usage and `COMPATIBILITY_RESULTS.md` for actual test results. End-to-end document editing is not yet verified.
 
 ## Target and dependency pin
 
@@ -22,9 +22,9 @@ Extract the pinned archive into the test application's root. Do not overlay it o
 dotnet build src/VRoidXYTool.IL2CPP -c Release -p:BepInExRoot="C:/path/to/test/VRoidStudio/BepInEx" -p:InteropRoot="C:/path/to/test/VRoidStudio/BepInEx/interop"
 ```
 
-The default dependency paths are `.local/bepinex-788/BepInEx` and `.local/VRoidStudio/BepInEx/interop`. DLL references are not copied into plugin output. Generated Il2Cppmscorlib is aliased; nullable annotations are disabled in the bootstrap source because the generated core-library attributes interfere with nullable metadata compilation. Install only `src/VRoidXYTool.IL2CPP/bin/Release/net6.0/VRoidXYTool.IL2CPP.dll` into `BepInEx/plugins/VRoidXYTool.IL2CPP/` inside the test application.
+The default dependency paths are `.local/bepinex-788/BepInEx` and `.local/VRoidStudio/BepInEx/interop`. Game/loader DLL references are not copied into plugin output. Generated Il2Cppmscorlib is aliased; nullable annotations are disabled in the plugin source and a CLR NullableAttribute shim supports delegate metadata because generated stripped attributes interfere with compilation. Install `VRoidXYTool.IL2CPP.dll` and `VRoidXYTool.SyncCore.dll` from `src/VRoidXYTool.IL2CPP/bin/Release/net6.0/` into `BepInEx/plugins/VRoidXYTool.IL2CPP/` inside the test application.
 
-Launch VRoidStudio.exe normally and inspect `BepInEx/LogOutput.log`. Require both BepInEx chainloader completion and `Bootstrap initialized` from this plugin. The bootstrap registers a Unity lifecycle component via BasePlugin.AddComponent; OnApplicationQuit logs shutdown. Explicit plugin Unload removes the ProcessExit handler, destroys the component and is idempotent. This version starts no watcher, thread, patch or document editing operation.
+Launch VRoidStudio.exe normally and inspect `BepInEx/LogOutput.log`. Require both BepInEx chainloader completion and `Bootstrap initialized` from this plugin. The bootstrap registers a Unity lifecycle component via BasePlugin.AddComponent; OnApplicationQuit disposes the bridge and logs shutdown. Explicit plugin Unload destroys the component and is idempotent. Cleanup runs through Unity lifecycle callbacks rather than ProcessExit, so no native Unity calls are made from a CLR exit thread. The texture bridge installs a selection-event postfix and begins document edits only after an explicit layer link and changed external PNG.
 
 For an unattended normal-shutdown test, set `[Diagnostics] QuitAfterSeconds = 10` in `BepInEx/config/io.github.nytmaer.vroidxytool.il2cpp.cfg`. This enables background updates and invokes Unity Application.Quit after ten seconds. Default is 0 (disabled). Require `Bootstrap shutdown completed` and a clean process exit; an abrupt process kill does not verify shutdown. Reset the setting to 0 before document tests.
 
@@ -38,7 +38,7 @@ Inspect the generated VRoid assemblies for RasterLayerViewModel, current documen
 
 `src/VRoidXYTool.SyncCore` implements explicit file links keyed by document/texture/layer identity. Poll it on the Unity thread with monotonic elapsed time. It uses exclusive bounded reads, stable content hashes over a quiet period, retry after failed imports, and export acknowledgements. No FileSystemWatcher is required, so rename-based saves and missed watcher events are covered by polling. This reads/hashes the file per poll: tune intervals and profile before scaling to many large textures.
 
-The bridge callback must verify the current document and target identities, fully decode PNG data and execute the document edit command. The core deliberately does not claim that stable bytes imply a complete valid PNG. Dispose links on document change/shutdown. The core is not yet connected to the bootstrap or a VRoid bridge.
+The bridge callback verifies document session and layer identity, resolves the stored layer through a document query, preflights PNG bounds/completeness, decodes it and executes the document edit command. The core deliberately does not claim that stable bytes imply a complete valid PNG. Links are disposed on document change/shutdown. It is connected in version 0.2.0; actual layer export/import and persistence remain to be tested.
 
 ```powershell
 dotnet run --project tests/VRoidXYTool.SyncCore.Tests -c Release -p:NuGetAudit=false

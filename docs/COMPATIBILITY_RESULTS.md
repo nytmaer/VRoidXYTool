@@ -51,8 +51,8 @@ These are confirmed wrapper signatures, not verified invocations or usable Harmo
 | Registered Unity lifecycle component | Pass |
 | Normal shutdown hook and exit | Pass in batch mode; interactive quit untested |
 | File core tests | Pass |
-| Layer capture / export inside editor | Not implemented or tested |
-| External PNG applies without manual import | Not implemented or tested |
+| Layer capture / export inside editor | Implemented in 0.2.0; document test pending |
+| External PNG applies without manual import | Implemented in 0.2.0; document test pending |
 | Repeated saves inside editor | Untested |
 | Layer/material/document switching | Untested |
 | Save/reopen persistence | Untested |
@@ -70,10 +70,18 @@ The file core harness passed baseline/export deduplication, quiet period, same-s
 
 ## Shortest path to a functional prototype
 
-1. Add a VRoid 2.14 bridge project referencing the generated assemblies. Verify current-file context access and a usable layer discovery hook on a disposable model; constructor presence alone is insufficient.
-2. Capture full document, texture and layer identity at export. Export via GetRasterLayerContentQuery and encoding utilities. Use identity-based filenames and retain display labels separately.
-3. Connect SettledFileLink polling to the Unity component. Reject callbacks after document changes or invalid target layers. Decode PNG with Unity ImageConversion, convert pixel arrays as required, then execute LoadImageToEditableImageRasterLayerCommand through the correct current document context.
+1. The version-specific bridge now exists in `VRoid214Bridge.cs`. Verify selected-layer capture and context access on a disposable model.
+2. Exercise its export path: document-session identity, editable-image/NodeId paths, GetRasterLayerContentQuery, PNG encoding and identity-based filenames are implemented.
+3. Exercise connected SettledFileLink polling and document commands. Document switches dispose links; PNG import uses generated pixel arrays. These paths compile but have not run with a loaded model.
 4. Test at least five saves, locked/atomic editor saves, layer/material switching, document replacement, undo/history behavior and normal application quit.
 5. Save and reopen the disposable `.vroid`; confirm the imported content survived. Only then mark live synchronization and Sprint 001 complete.
 
 No changes were pushed, and main was not modified. Development changes are committed locally on the migration branch.
+
+## Version 0.2.0 follow-up
+
+Added the version-gated bridge, selected-layer controls, document-session link invalidation, stable PNG import through editing commands and a uGUI input blocker. Version gate checks `Application.version == 2.14.0`. The postfix targets `TextureEditor.ViewModel.OnSelectedLayerUpdated`, avoiding constructor detours. Linking explicitly enables background updates and restores the original setting when links are cleared.
+
+Final tested build (PID 320808) loaded `VRoidXYTool Live Texture Prototype 0.2.0`, logged `VRoid 2.14 texture selection hook installed`, completed chainloader startup and logged normal shutdown with exit code 0. This verifies hook installation and blocker construction in batch mode, not invocation of the hook with a selected layer, interactive input blocking or PNG import. The existing Class::Init fallback warning remains.
+
+The expanded file-core harness passed a real 1x1 PNG fixture, rejection of every truncated prefix, excessive dimensions, trailing bytes and non-PNG data, plus all previous file synchronization regressions. Final release build has zero warnings/errors. PNG semantic decoding still belongs to Unity's decoder. See `LIVE_TEXTURE_PROTOTYPE.md` for the interactive acceptance checklist. A disposable model path has been requested for document tests.
