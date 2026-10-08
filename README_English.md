@@ -10,6 +10,8 @@ The `dev/il2cpp-migration` branch includes a working live PNG texture prototype 
 
 See [installation and usage](docs/IL2CPP_INSTALLATION.md), [verified compatibility results](docs/COMPATIBILITY_RESULTS.md), and [architecture audit](docs/ARCHITECTURE_AUDIT.md). Original MIT attribution and legacy source are retained.
 
+The optional [second-monitor Companion](docs/COMPANION.md) shows linked layers and sync status and opens their PNGs in an external editor. This first Windows WPF slice uses a local bridge snapshot and requires .NET 10 Windows Desktop; installer work is deferred.
+
 ## Why is the plug-in unavailable after VRoid Studio 1.26.1?
 
 Starting from 1.26.1, vroid studio changed mono to il2cpp, which resulted in all plugins becoming invalid and difficult to fix. I will try to remake the plugin under il2cpp, but it is also possible to permanently stop updating. If you want to continue using plugins, you can download version 1.26.0 of vroid studio from the official website.

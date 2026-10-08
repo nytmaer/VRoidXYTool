@@ -12,3 +12,5 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - run: dotnet run --project tests/VRoidXYTool.SyncCore.Tests -c Release -p:NuGetAudit=false
+      - run: dotnet run --project tests/VRoidXYTool.CompanionCore.Tests -c Release -p:NuGetAudit=false
+      - run: dotnet build src/VRoidXYTool.Companion -c Release -p:NuGetAudit=false

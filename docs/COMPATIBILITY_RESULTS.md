@@ -151,3 +151,16 @@ After resetting the Computer Use session, the isolated app appeared after the la
 * Restored both exported baselines; both restoration imports were logged and the iris marker disappeared. Clicking Unlink all showed zero links and disabled Copy linked PNG path.
 
 The isolated app is left open on the disposable Song test project with all links cleared. Original source assets remain untouched. Full-screen-size coverage and Photoshop-specific saves remain unverified; the native two-layer workflow and representative pointer-blocking checks are now exercised. GitHub PR workflow for code commit 78fa93b completed successfully.
+
+## Companion first slice — October 8, 2026
+
+The user deferred installer work and selected a second-monitor window listing linked layers and opening their PNGs externally. Added the Windows WPF Companion and a shared schema-1 snapshot contract. The plugin atomically publishes link identity, name, path, sync status and last-import time once per second; shutdown publishes an offline empty list. Current state is reread before open/copy actions so stale document selections cannot open an old link. Heartbeat freshness, registered identity, PNG extension and export-root containment are checked.
+
+* Normal-mode diagnostic PID 364812 passed all six imports and existing native isolation/history/save/reopen checks, while the driver observed two live Companion rows and verified the final offline empty snapshot with exit code 0.
+* Final bridge build also keeps the heartbeat running when no layers are linked. Normal-mode PID 333304 published a live empty state before linking; after native iris linking the Companion displayed Default Design and Synced while VRoid was unfocused.
+* Companion row selection and **Open PNG in editor** launched the exact exported iris filename in installed Krita. A native Krita PNG save with transparency imported into the original iris layer. The Companion displayed its last-import time (17:26:29 local), retained selection and enabled actions across refreshes. **Copy PNG path** reported success.
+* Native **Unlink all** removed the Companion row, disabled open/copy, and retained a current live heartbeat with zero links while the Companion had focus. The disposable VRoid project is left open with links cleared.
+* Both contract and filesystem regression harnesses passed. Contract checks cover roundtrip identity, stale/stopped bridge, old document id, path traversal, non-PNG/missing file, unknown schema, atomic clearing, malformed/null-layer/oversized snapshots. Both Release builds completed with zero warnings/errors. The final selected-row contrast adjustment was compiled after the interactive check.
+* Original `Song.vroid` SHA256 is still `E932FB79966C243F3373CA6E0615151DA4E1817FE920D674369A60CC673C2CC1`. No source model, personal assets, application binaries or generated interop are included in the change.
+
+The UI check used one monitor; actual multi-monitor placement, varied DPI, alternate chosen editor and default PNG association remain unverified. The Companion requires .NET 10 Windows Desktop, stores no editor preference, and includes no installer, thumbnails or native document editing controls. CI now runs both independent harnesses and compiles the WPF app; native bridge acceptance remains local.

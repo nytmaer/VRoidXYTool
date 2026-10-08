@@ -36,7 +36,9 @@ public sealed class Plugin : BasePlugin
                 {
                     Bridge = new VRoid214Bridge(Log, Config.Bind("TextureSync", "Directory",
                         Path.Combine(Paths.GameRootPath, "LinkTextureIL2CPP"), "Directory for exported PNG files.").Value,
-                        Config.Bind("TextureSync", "ShowControlsOnStartup", true, "Show the texture control panel when the plugin loads.").Value);
+                        Config.Bind("TextureSync", "ShowControlsOnStartup", true, "Show the texture control panel when the plugin loads.").Value,
+                        Config.Bind("Companion", "StatePath", Path.Combine(Paths.GameRootPath, "Companion", "bridge-state.json"),
+                            "Local state file for the second-monitor Companion.").Value);
                 }
                 catch (Exception error) { Log.LogError($"Texture bridge disabled: {error}"); }
             }

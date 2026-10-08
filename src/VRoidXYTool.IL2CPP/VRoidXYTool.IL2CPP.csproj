@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../VRoidXYTool.SyncCore/VRoidXYTool.SyncCore.csproj" />
+    <ProjectReference Include="../VRoidXYTool.CompanionCore/VRoidXYTool.CompanionCore.csproj" />
     <Reference Include="BepInEx.Core" HintPath="$(BepInExRoot)/core/BepInEx.Core.dll" Private="false" />
     <Reference Include="BepInEx.Unity.IL2CPP" HintPath="$(BepInExRoot)/core/BepInEx.Unity.IL2CPP.dll" Private="false" />
     <Reference Include="Il2CppInterop.Runtime" HintPath="$(BepInExRoot)/core/Il2CppInterop.Runtime.dll" Private="false" />

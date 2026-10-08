@@ -14,6 +14,7 @@ using VRoidCore.Editing;
 using VRoidCore.Editing.Query;
 using VRoidCore.Editing.History.Command;
 using VRoidXYTool.SyncCore;
+using VRoidXYTool.CompanionCore;
 using VRoidStudio.GUI.AvatarEditor;
 using EditorVM = VRoid.Studio.TextureEditor.ViewModel;
 using CoreModel = VRoidCore.Common.SpecificTypes.Model;
@@ -28,12 +29,14 @@ internal sealed class VRoid214Bridge : IDisposable
     private readonly Harmony harmony = new(Plugin.Id + ".texture214");
     private readonly Stopwatch clock = Stopwatch.StartNew();
     private readonly string directory;
+    private readonly string statePath;
     private readonly Dictionary<LayerIdentity, LinkedLayer> links = new();
     private CurrentFileModel document;
     private EditorVM editor;
     private string session;
     private TimeSpan nextPoll;
     private TimeSpan nextError;
+    private TimeSpan nextSnapshot;
     private bool show;
     private bool disposed;
     private GameObject blockerCanvas;
@@ -46,10 +49,11 @@ internal sealed class VRoid214Bridge : IDisposable
     private GUIStyle buttonStyle;
     private string status = "Open texture editing, select a raster layer, then link it.";
 
-    public VRoid214Bridge(ManualLogSource log, string directory, bool showOnStartup = true)
+    public VRoid214Bridge(ManualLogSource log, string directory, bool showOnStartup = true, string statePath = null)
     {
         this.log = log;
         this.directory = Path.GetFullPath(directory);
+        this.statePath = statePath;
         show = showOnStartup;
         active = this;
         try
@@ -60,7 +64,15 @@ internal sealed class VRoid214Bridge : IDisposable
             harmony.Patch(AccessTools.PropertySetter(typeof(EditorVM), "SelectedLayer"),
                 postfix: new HarmonyMethod(typeof(VRoid214Bridge), nameof(SelectionUpdated)));
             CreateInputBlocker();
+            // Keep the Companion heartbeat current even before the first layer is linked.
+            if (statePath != null)
+            {
+                originalBackgroundSetting = Application.runInBackground;
+                ownsBackgroundSetting = true;
+                Application.runInBackground = true;
+            }
             log.LogInfo("VRoid 2.14 texture selection hook installed. Tab opens linked texture controls.");
+            if (statePath != null) log.LogInfo("Companion bridge state: " + statePath);
         }
         catch
         {
@@ -93,6 +105,11 @@ internal sealed class VRoid214Bridge : IDisposable
             nextPoll = clock.Elapsed + TimeSpan.FromMilliseconds(250);
             foreach (var link in links.Values.ToArray())
                 link.File.Poll(clock.Elapsed, (_, bytes) => Import(link, bytes));
+            if (clock.Elapsed >= nextSnapshot)
+            {
+                nextSnapshot = clock.Elapsed + TimeSpan.FromSeconds(1);
+                PublishSnapshot(true);
+            }
         }
         catch (Exception error) { Report(error); }
     }
@@ -199,7 +216,7 @@ internal sealed class VRoid214Bridge : IDisposable
         File.WriteAllBytes(filePath, bytes);
         exportedPath = filePath;
         if (links.Remove(identity, out var previous)) previous.File.Dispose();
-        links.Add(identity, new LinkedLayer(path,
+        links.Add(identity, new LinkedLayer(path, label,
             new SettledFileLink(identity, filePath, bytes, TimeSpan.FromMilliseconds(500))));
         if (!ownsBackgroundSetting)
         {
@@ -231,6 +248,7 @@ internal sealed class VRoid214Bridge : IDisposable
             context.ExecuteSyncCommand(command.Cast<ISyncCommand<Context.HistoryManagerContext, CoreModel>>());
             status = $"Updated linked layer at {DateTime.Now:T}.";
             log.LogInfo($"Imported linked raster layer {link.File.Identity.Texture}/{link.File.Identity.Layer}.");
+            link.LastImportedUtc = DateTimeOffset.UtcNow;
             return true;
         }
         catch (Exception error) { Report(error); return false; }
@@ -250,10 +268,35 @@ internal sealed class VRoid214Bridge : IDisposable
         foreach (var link in links.Values) link.File.Dispose();
         links.Clear();
         exportedPath = null;
-        if (ownsBackgroundSetting)
+        if (ownsBackgroundSetting && (statePath == null || disposed))
         {
             Application.runInBackground = originalBackgroundSetting;
             ownsBackgroundSetting = false;
+        }
+    }
+
+    private void PublishSnapshot(bool running)
+    {
+        if (statePath == null) return;
+        try
+        {
+            SnapshotFile.Write(statePath, new BridgeSnapshot
+            {
+                PublishedUtc = DateTimeOffset.UtcNow, Running = running,
+                ApplicationVersion = Application.version, DocumentSession = running ? session : null,
+                ExportRoot = directory, Message = running ? status : "VRoid bridge stopped.",
+                Layers = running ? links.Select(pair => new LinkedTextureSnapshot
+                {
+                    Id = pair.Key.Document + "/" + pair.Key.Texture + "/" + pair.Key.Layer,
+                    Name = pair.Value.Label, PngPath = pair.Value.File.FilePath,
+                    Status = pair.Value.File.Status, LastImportedUtc = pair.Value.LastImportedUtc
+                }).ToList() : new List<LinkedTextureSnapshot>()
+            });
+        }
+        catch (Exception error)
+        {
+            // Companion connectivity must never stop texture imports.
+            if (clock.Elapsed >= nextError) { nextError = clock.Elapsed + TimeSpan.FromSeconds(5); log.LogWarning("Companion state write failed: " + error.Message); }
         }
     }
 
@@ -285,6 +328,7 @@ internal sealed class VRoid214Bridge : IDisposable
         harmony.UnpatchSelf();
         if (blockerCanvas != null) UnityEngine.Object.Destroy(blockerCanvas);
         ClearLinks();
+        PublishSnapshot(false);
         editor = null;
         document = null;
     }
@@ -293,6 +337,8 @@ internal sealed class VRoid214Bridge : IDisposable
     {
         public readonly EditableImageRasterLayerPath Path;
         public readonly SettledFileLink File;
-        public LinkedLayer(EditableImageRasterLayerPath path, SettledFileLink file) { Path = path; File = file; }
+        public readonly string Label;
+        public DateTimeOffset? LastImportedUtc;
+        public LinkedLayer(EditableImageRasterLayerPath path, string label, SettledFileLink file) { Path = path; Label = label; File = file; }
     }
 }

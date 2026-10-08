@@ -21,6 +21,7 @@ public sealed class SettledFileLink : IDisposable
 
     public LayerIdentity Identity { get; }
     public string FilePath { get; }
+    public string Status { get; private set; } = "Linked";
 
     public SettledFileLink(LayerIdentity identity, string filePath, byte[] exportedPng,
         TimeSpan quietPeriod, int maxBytes = 64 * 1024 * 1024)
@@ -50,6 +51,7 @@ public sealed class SettledFileLink : IDisposable
             using var stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.None);
             if (stream.Length == 0 || stream.Length > maxBytes)
             {
+                Status = "Waiting for a complete file";
                 candidateHash = null;
                 return false;
             }
@@ -62,22 +64,24 @@ public sealed class SettledFileLink : IDisposable
                 offset += read;
             }
         }
-        catch (IOException) { candidateHash = null; return false; }
-        catch (UnauthorizedAccessException) { candidateHash = null; return false; }
+        catch (IOException) { Status = "File missing or busy"; candidateHash = null; return false; }
+        catch (UnauthorizedAccessException) { Status = "File access denied"; candidateHash = null; return false; }
 
         string hash = Hash(bytes);
-        if (hash == appliedHash) { candidateHash = null; return false; }
+        if (hash == appliedHash) { Status = "Synced"; candidateHash = null; return false; }
         if (hash != candidateHash)
         {
             candidateHash = hash;
             candidateSince = elapsed;
+            Status = "Waiting for save to settle";
             return false;
         }
         if (elapsed - candidateSince < quietPeriod) return false;
-        if (!apply(Identity, bytes)) return false;
+        if (!apply(Identity, bytes)) { Status = "Import deferred"; return false; }
         // Commit only the bytes actually imported. A subsequent external save is caught next poll.
         appliedHash = hash;
         candidateHash = null;
+        Status = "Synced";
         return true;
     }
 
