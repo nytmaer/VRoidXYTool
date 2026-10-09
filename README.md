@@ -4,7 +4,7 @@ A port of [xiaoye97/VRoidXYTool](https://github.com/xiaoye97/VRoidXYTool) to cur
 
 The original plugin stopped working when VRoid Studio 1.26.1 switched from Mono to IL2CPP. This fork rebuilds its core workflow, live texture linking, for **VRoid Studio 2.14.0** on **BepInEx 6 (IL2CPP)**. It also adds a second-monitor Companion and edit-mode camera and reference tools.
 
-> **Credit.** VRoidXYTool was created by 宵夜 (xiaoye97) and released under the MIT license. The original source, license and attribution are kept in this repository. For the original plugin and its Chinese documentation, see the [upstream repository](https://github.com/xiaoye97/VRoidXYTool). 原版插件及中文说明请见[上游仓库](https://github.com/xiaoye97/VRoidXYTool)。
+> **Credit.** VRoidXYTool was created by xiaoye97 and released under the MIT license. The original source, license and attribution are kept in this repository. For the original plugin and its Chinese documentation, see the [upstream repository](https://github.com/xiaoye97/VRoidXYTool).
 
 This plugin is free. It must not be sold in any form.
 
@@ -15,10 +15,12 @@ This plugin is free. It must not be sold in any form.
 | Feature | Status |
 | --- | --- |
 | Live texture linking | Ported. Link raster layers, edit the PNGs in Krita or another editor, and saves sync into VRoid automatically |
-| Camera presets | Ported (edit mode). Body and head views, perspective/orthographic, four saved slots |
-| Reference guides | Ported (edit mode). PNG overlay and alignment grid inside the model viewport |
+| Camera presets | Partial port (edit mode). Body and head views, perspective/orthographic, four saved slots |
+| Reference guides | Partial port (edit mode). One PNG overlay and alignment grid inside the model viewport |
 | Second-monitor Companion | New. A separate window listing linked layers with live thumbnails and sync status |
 | Pose presets, MMD/VMD player, video recording, anti-aliasing, wireframe | Not ported. Legacy source is kept under `VRoidXYTool/` |
+
+Legacy pose-preset code is preserved, but its startup and UI registration were disabled in the original source snapshot. Camera and reference tools do not yet reproduce every legacy control or preset format.
 
 ### What changed from the original
 
@@ -78,4 +80,4 @@ Report bugs and suggestions in [GitHub Issues](https://github.com/nytmaer/VRoidX
 
 ## License
 
-MIT, © 2021 宵夜 (xiaoye97). See [LICENSE](LICENSE). The IL2CPP port and Companion are released under the same license.
+MIT, copyright 2021 xiaoye97. See [LICENSE](LICENSE) for the original attribution. The IL2CPP port and Companion are released under the same license.
