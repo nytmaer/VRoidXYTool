@@ -15,12 +15,15 @@ This plugin is free. It must not be sold in any form.
 | Feature | Status |
 | --- | --- |
 | Live texture linking | Ported. Link raster layers, edit the PNGs in Krita or another editor, and saves sync into VRoid automatically |
-| Camera presets | Partial port (edit mode). Body and head views, perspective/orthographic, four saved slots |
-| Reference guides | Partial port (edit mode). One PNG overlay and alignment grid inside the model viewport |
+| Camera presets | Expanded implementation: ten slots per projection, clear, size/rotation, legacy import and photo-booth access. Full native acceptance pending |
+| Reference guides | Expanded implementation: multiple PNG/JPG references, screen/world placement, ruler/grid and saved presets. Full native acceptance pending |
 | Second-monitor Companion | New. A separate window listing linked layers with live thumbnails and sync status |
-| Pose presets, MMD/VMD player, video recording, anti-aliasing, wireframe | Not ported. Legacy source is kept under `VRoidXYTool/` |
+| Pose presets | Native save/load/reset tested. Legacy `.posejson` migration and remaining dialog/deletion checks pending |
+| MMD/VMD player | Implemented; head-turn playback, loop, pause, seek, stop and photo-booth exit tested. Broader motion coverage pending |
+| MP4 recording | Tested silent H.264 capture with configurable FPS/bitrate, hotkey stop and automatic finalization. Requires external FFmpeg |
+| Anti-aliasing and wireframe | Implemented; editor wireframe/restoration and a 4× AA request tested. Broader rendering acceptance pending |
 
-Legacy pose-preset code is preserved, but its startup and UI registration were disabled in the original source snapshot. Camera and reference tools do not yet reproduce every legacy control or preset format.
+Feature parity remains in progress. The [completion checklist](docs/LOCAL_COMPLETION_CHECKLIST.md) and [native acceptance report](docs/WORKSPACE_NATIVE_ACCEPTANCE.md) distinguish implemented controls from verified behavior. Legacy source remains under `VRoidXYTool/` with its original attribution.
 
 ### What changed from the original
 
@@ -28,7 +31,8 @@ Legacy pose-preset code is preserved, but its startup and UI registration were d
 - **Safer texture sync.** Links are tied to the document and the specific layer, so edits go only to the layer you linked, even after you select another layer or open a different model. Saves are applied only after the file stops changing and passes a PNG check. A truncated or half-written save is ignored until a valid one arrives. Imports go through VRoid's own undo/redo. Opening a different model clears all links.
 - **Multiple layers.** You can link several layers at once and switch materials while editing.
 - **Companion app.** A Windows window for a second monitor. It shows each linked layer, a thumbnail, sync status and last import time, and opens the PNG in your editor in one click.
-- **Workspace tools.** Camera presets and reference guides change only the editing view; they never modify your model.
+- **Workspace tools.** Expanded cameras and references support editing and photo-booth workflows. Pose and VMD tools operate on the active photo-booth rig and restore the previous pose when motion stops.
+- **Recording.** Silent MP4 capture runs encoding off Unity's thread, uses a bounded queue and finalizes clips before exposing the completed filename.
 
 ## Requirements
 
@@ -60,12 +64,15 @@ Full details:
 - [Installation and usage](docs/IL2CPP_INSTALLATION.md)
 - [Second-monitor Companion](docs/COMPANION.md)
 - [Camera presets and reference guides](docs/WORKSPACE_TOOLS.md)
+- [MP4 recording](docs/RECORDING.md)
+- [Current feature acceptance and remaining checks](docs/WORKSPACE_NATIVE_ACCEPTANCE.md)
 
 ## Known limits
 
 - Tested only on VRoid Studio 2.14.0 with Krita, on one Windows two-monitor setup. Photoshop saves and other monitor/DPI arrangements are not yet verified.
 - PNGs are limited to 4096×4096 and 64 MiB.
-- Camera and reference tools work in edit mode only, not the photo booth.
+- Expanded camera/reference, pose, VMD and rendering features have incomplete native acceptance; see the linked checklist.
+- Recording needs an existing FFmpeg executable with `libx264`. Hard-crash recording recovery is not implemented.
 - No installer or prebuilt download yet.
 
 Test evidence is recorded in [compatibility results](docs/COMPATIBILITY_RESULTS.md), and the migration design in the [architecture audit](docs/ARCHITECTURE_AUDIT.md).

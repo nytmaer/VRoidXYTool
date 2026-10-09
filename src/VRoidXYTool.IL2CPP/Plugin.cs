@@ -38,7 +38,9 @@ public sealed class Plugin : BasePlugin
                         Path.Combine(Paths.GameRootPath, "LinkTextureIL2CPP"), "Directory for exported PNG files.").Value,
                         Config.Bind("TextureSync", "ShowControlsOnStartup", true, "Show the texture control panel when the plugin loads.").Value,
                         Config.Bind("Companion", "StatePath", Path.Combine(Paths.GameRootPath, "Companion", "bridge-state.json"),
-                            "Local state file for the second-monitor Companion.").Value);
+                            "Local state file for the second-monitor Companion.").Value,
+                        Config.Bind("TextureSync", "PollMilliseconds", 250, "Polling interval, clamped to 100–5000 milliseconds. A file must settle before import.").Value,
+                        Config.Bind("TextureSync", "GroupByModel", false, "Group export sessions in stable model folders. Session isolation remains active.").Value);
                 }
                 catch (Exception error) { Log.LogError($"Texture bridge disabled: {error}"); }
             }
@@ -47,7 +49,7 @@ public sealed class Plugin : BasePlugin
         string diagnosticPath = Config.Bind("Diagnostics", "ModelPath", "", "Opt-in disposable document test; only .local/test-models paths accepted.").Value;
         if (Bridge != null && !string.IsNullOrWhiteSpace(diagnosticPath))
         {
-            try { Diagnostic = new DocumentDiagnostic(this, Log, diagnosticPath); Application.runInBackground = true; }
+            try { Diagnostic = new DocumentDiagnostic(this, Log, diagnosticPath, Config.Bind("Diagnostics", "OpenOnly", false, "Open the disposable model for manual workspace acceptance without executing texture edits.").Value); Application.runInBackground = true; }
             catch (Exception error) { Log.LogError(error); }
         }
     }
@@ -93,6 +95,7 @@ public sealed class BootstrapLifecycle : MonoBehaviour
     }
 
     public void OnApplicationQuit() => Owner?.Stop();
+    public void LateUpdate() => Owner?.Bridge?.LateUpdate();
     public void OnGUI()
     {
         if (!guiLogged) { guiLogged = true; Owner?.Log.LogInfo("Unity lifecycle OnGUI callback confirmed."); }
