@@ -7,6 +7,9 @@
     <InteropRoot Condition="'$(InteropRoot)' == ''">../../.local/VRoidStudio/BepInEx/interop</InteropRoot>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="../../VRoidXYTool/guide" LogicalName="VRoidXYTool.guide" />
+    <Reference Include="UnityEngine.AssetBundleModule" HintPath="$(InteropRoot)/UnityEngine.AssetBundleModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AnimationModule" HintPath="$(InteropRoot)/UnityEngine.AnimationModule.dll" Private="false" />
     <ProjectReference Include="../VRoidXYTool.SyncCore/VRoidXYTool.SyncCore.csproj" />
     <ProjectReference Include="../VRoidXYTool.CompanionCore/VRoidXYTool.CompanionCore.csproj" />
     <Reference Include="BepInEx.Core" HintPath="$(BepInExRoot)/core/BepInEx.Core.dll" Private="false" />
