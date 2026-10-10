@@ -19,6 +19,7 @@ internal sealed class DocumentDiagnostic
     private readonly string modelPath;
     private readonly ManualLogSource log;
     private readonly Plugin plugin;
+    private readonly bool openOnly;
     private readonly Stopwatch clock = Stopwatch.StartNew();
     private readonly string output = Path.Combine(Paths.GameRootPath, "diagnostic");
     private Il2CppSystem.Threading.Tasks.Task opening;
@@ -37,9 +38,10 @@ internal sealed class DocumentDiagnostic
     private byte[] exportedBaseline;
     private float expectedBlue;
 
-    internal DocumentDiagnostic(Plugin plugin, ManualLogSource log, string requestedPath)
+    internal DocumentDiagnostic(Plugin plugin, ManualLogSource log, string requestedPath, bool openOnly = false)
     {
         this.plugin = plugin;
+        this.openOnly = openOnly;
         this.log = log;
         modelPath = Path.GetFullPath(requestedPath);
         string allowed = Path.GetFullPath(Path.Combine(Paths.GameRootPath, "..", "test-models")) + Path.DirectorySeparatorChar;
@@ -64,7 +66,7 @@ internal sealed class DocumentDiagnostic
             if (stage == 0)
             {
                 log.LogInfo("DIAGNOSTIC: opening disposable project copy.");
-                opening = main.ActionHandler.Open(modelPath, false);
+                opening = openOnly ? main.ImportFileAndMoveToEditRoot(modelPath, false, false) : main.ActionHandler.Open(modelPath, false);
                 stage = 1;
                 return;
             }
@@ -74,6 +76,13 @@ internal sealed class DocumentDiagnostic
             if (document == null || document.engine.Disposed) return;
             if (!string.Equals(Path.GetFullPath(document.path), modelPath, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Diagnostic current document is not the disposable copy.");
+            if (openOnly)
+            {
+                complete = true;
+                File.WriteAllText(Path.Combine(output, "result.txt"), "OPENED: disposable workspace acceptance model");
+                log.LogInfo("DIAGNOSTIC: opened disposable copy for workspace acceptance; no document edits executed.");
+                return;
+            }
             var context = document.engine.Context;
             if (!context.IsQueryExecutable || !context.IsCommandExecutable) return;
 

@@ -25,11 +25,16 @@ namespace VRoidXYTool.IL2CPP;
 internal sealed class VRoid214Bridge : IDisposable
 {
     private static VRoid214Bridge active;
+    private static AvatarEditor cachedAvatar;
+    private static int avatarSearchFrame = -1;
+    private static readonly string[] TabNames = { "Textures", "Cameras", "Guides", "Photo booth", "Rendering", "Recording" };
     private readonly ManualLogSource log;
     private readonly Harmony harmony = new(Plugin.Id + ".texture214");
     private readonly Stopwatch clock = Stopwatch.StartNew();
     private readonly string directory;
     private readonly string statePath;
+    private readonly int pollMilliseconds;
+    private readonly bool groupByModel;
     private readonly Dictionary<LayerIdentity, LinkedLayer> links = new();
     private CurrentFileModel document;
     private EditorVM editor;
@@ -49,13 +54,32 @@ internal sealed class VRoid214Bridge : IDisposable
     private GUIStyle buttonStyle;
     private string status = "Open texture editing, select a raster layer, then link it.";
     private readonly WorkspaceTools workspace;
+    private readonly PhotoBoothTools photoBooth = new();
+    private readonly RenderingTools rendering = new();
+    private readonly RecordingTools recording;
     private int tab;
+    private Il2CppSystem.Threading.Tasks.Task<Il2CppSystem.Collections.Generic.ICollection<byte>> uvExport;
+    private string uvSession, uvOutput;
+    private readonly BepInEx.Configuration.ConfigEntry<float> panelX, panelY, panelScale;
+    private readonly BepInEx.Configuration.ConfigEntry<bool> compact;
+    private readonly BepInEx.Configuration.ConfigEntry<KeyCode> toggleKey;
+    private bool dragging;
+    private Vector2 dragOffset;
 
-    public VRoid214Bridge(ManualLogSource log, string directory, bool showOnStartup = true, string statePath = null)
+    public VRoid214Bridge(ManualLogSource log, string directory, bool showOnStartup = true, string statePath = null, int pollMilliseconds = 250, bool groupByModel = false)
     {
         this.log = log;
+        var config = BootstrapLifecycle.Owner.Config;
+        panelX=config.Bind("Workspace", "PanelX", 20f, "Panel left position in Unity screen pixels; drag its title to move.");
+        panelY=config.Bind("Workspace", "PanelY", 20f, "Panel top position in Unity screen pixels.");
+        panelScale=config.Bind("Workspace", "PanelScale", 1f, "Panel scale, clamped to 0.5–1.5 and fitted to the window.");
+        compact=config.Bind("Workspace", "Compact", false, "Collapse the panel to its title and tabs.");
+        toggleKey=config.Bind("Workspace", "ToggleKey", KeyCode.Tab, "Show or hide the workspace panel.");
+        recording = new RecordingTools(log, BootstrapLifecycle.Owner.Config);
         this.directory = Path.GetFullPath(directory);
         this.statePath = statePath;
+        this.pollMilliseconds = Math.Clamp(pollMilliseconds, 100, 5000);
+        this.groupByModel = groupByModel;
         workspace = new WorkspaceTools(log, Path.Combine(BepInEx.Paths.ConfigPath, "VRoidXYToolWorkspace.json"), Path.Combine(BepInEx.Paths.GameRootPath, "Companion", "reference.png"));
         show = showOnStartup;
         active = this;
@@ -97,15 +121,19 @@ internal sealed class VRoid214Bridge : IDisposable
         if (disposed) return;
         try
         {
-            if (BepInEx.UnityInput.Current.GetKeyDown(KeyCode.Tab))
+            if (BepInEx.UnityInput.Current.GetKeyDown(toggleKey.Value))
             {
                 show = !show;
                 log.LogInfo("Texture controls visible: " + show);
             }
             if (blocker != null) blocker.SetActive(show);
             RefreshDocument();
+            workspace.Update();
+            photoBooth.Update();
+            recording.Update();
+            FinishUVExport();
             if (clock.Elapsed < nextPoll) return;
-            nextPoll = clock.Elapsed + TimeSpan.FromMilliseconds(250);
+            nextPoll = clock.Elapsed + TimeSpan.FromMilliseconds(pollMilliseconds);
             foreach (var link in links.Values.ToArray())
                 link.File.Poll(clock.Elapsed, (_, bytes) => Import(link, bytes));
             if (clock.Elapsed >= nextSnapshot)
@@ -117,6 +145,8 @@ internal sealed class VRoid214Bridge : IDisposable
         catch (Exception error) { Report(error); }
     }
 
+    internal void LateUpdate() { if (!disposed) { photoBooth.LateUpdate(); recording.LateUpdate(); } }
+
     private void RefreshDocument()
     {
         var avatar = FindAvatar();
@@ -125,6 +155,9 @@ internal sealed class VRoid214Bridge : IDisposable
         ClearLinks();
         document = current;
         workspace.DocumentChanged();
+        photoBooth.DocumentChanged();
+        recording.DocumentChanged();
+        rendering.Dispose();
         editor = null;
         session = current == null ? null : Guid.NewGuid().ToString("N");
         status = current == null ? "Open a model to link textures." : "Select a raster layer in texture editing.";
@@ -133,8 +166,12 @@ internal sealed class VRoid214Bridge : IDisposable
 
     internal static AvatarEditor FindAvatar()
     {
+        if (cachedAvatar != null && cachedAvatar.gameObject.activeInHierarchy && cachedAvatar._viewModel != null) return cachedAvatar;
+        cachedAvatar = null;
+        if (avatarSearchFrame == Time.frameCount) return null;
+        avatarSearchFrame = Time.frameCount;
         foreach (var candidate in UnityEngine.Object.FindObjectsOfType<AvatarEditor>(true))
-            if (candidate != null && candidate._viewModel != null) return candidate;
+            if (candidate != null && candidate.gameObject.activeInHierarchy && candidate._viewModel != null) return cachedAvatar = candidate;
         return null;
     }
 
@@ -149,19 +186,48 @@ internal sealed class VRoid214Bridge : IDisposable
     {
         if (!disposed) { try { workspace.DrawGuides(); } catch (Exception e) { Report(e); } }
         if (!show || disposed) return;
+        float height = compact.Value ? 85 : tab == 0 ? 410 : tab == 3 ? 680 : 650;
+        float configuredScale=float.IsFinite(panelScale.Value)?Math.Clamp(panelScale.Value,.5f,1.5f):1;
+        float scale=Math.Min(configuredScale,Math.Min(Screen.width/800f,Screen.height/(height+20)));
+        float left=float.IsFinite(panelX.Value)?Math.Clamp(panelX.Value,0,Math.Max(0,Screen.width-780*scale)):20;
+        float top=float.IsFinite(panelY.Value)?Math.Clamp(panelY.Value,0,Math.Max(0,Screen.height-height*scale)):20;
+        var current=Event.current;
+        var title=new Rect(left,top,610*scale,32*scale);
+        if(current.type==EventType.MouseDown && current.button==0 && title.Contains(current.mousePosition))
+        {dragging=true;dragOffset=current.mousePosition-new Vector2(left,top);current.Use();}
+        if(dragging && current.type==EventType.MouseDrag)
+        {panelX.Value=Math.Clamp(current.mousePosition.x-dragOffset.x,0,Math.Max(0,Screen.width-780*scale));panelY.Value=Math.Clamp(current.mousePosition.y-dragOffset.y,0,Math.Max(0,Screen.height-height*scale));current.Use();}
+        if(dragging && current.type==EventType.MouseUp){dragging=false;current.Use();}
+        if(blocker!=null)
+        {var rect=blocker.GetComponent<RectTransform>();rect.anchoredPosition=new Vector2(left,-top);rect.sizeDelta=new Vector2(780*scale,height*scale);}
+        var matrix=GUI.matrix;var color=GUI.color;bool enabled=GUI.enabled;
+        try
+        {
+            GUI.matrix=matrix*Matrix4x4.TRS(new Vector3(left-20*scale,top-20*scale,0),Quaternion.identity,Vector3.one*scale);
+            DrawPanel(height);
+        }
+        finally {GUI.matrix=matrix;GUI.color=color;GUI.enabled=enabled;}
+    }
+
+    private void DrawPanel(float panelHeight)
+    {
         // Explicit styles avoid changing VRoid's shared GUI skin and remain readable at high DPI.
         panelStyle ??= CopyStyle(GUI.skin.box, 20);
         textStyle ??= CopyStyle(GUI.skin.label, 18);
         buttonStyle ??= CopyStyle(GUI.skin.button, 18);
         var previousColor = GUI.color;
         GUI.color = new UnityEngine.Color(0.08f, 0.08f, 0.08f, 0.97f);
-        float panelHeight = tab == 0 ? 310 : 490;
-        if (blocker != null) blocker.GetComponent<RectTransform>().sizeDelta = new Vector2(780, panelHeight);
         GUI.DrawTexture(new Rect(20, 20, 780, panelHeight), Texture2D.whiteTexture);
         GUI.color = previousColor;
-        GUI.Box(new Rect(20, 20, 780, panelHeight), "VRoidXYTool — Workspace (Tab to hide)", panelStyle);
-        string[] tabs = { "Textures", "Camera presets", "Reference guides" };
-        for (int i = 0; i < tabs.Length; i++) if (GUI.Button(new Rect(35 + i * 250, 55, 240, 36), tabs[i], buttonStyle)) tab = i;
+        GUI.Box(new Rect(20, 20, 780, panelHeight), "VRoidXYTool — Workspace ("+toggleKey.Value+" to hide)", panelStyle);
+        if(GUI.Button(new Rect(635,22,75,28),compact.Value?"Open":"Fold",buttonStyle))compact.Value=!compact.Value;
+        if(GUI.Button(new Rect(715,22,75,28),"Reset",buttonStyle)){panelX.Value=panelY.Value=20;panelScale.Value=1;}
+        var tabs = TabNames;
+        for (int i = 0; i < tabs.Length; i++) if (GUI.Button(new Rect(35 + i * 123, 55, 117, 36), tabs[i], buttonStyle)) tab = i;
+        if(compact.Value)return;
+        if (tab == 3) { try { photoBooth.Controls(textStyle, buttonStyle); } catch (Exception e) { Report(e); } return; }
+        if (tab == 4) { try { rendering.Controls(textStyle, buttonStyle); } catch (Exception e) { Report(e); } return; }
+        if (tab == 5) { try { recording.Controls(textStyle, buttonStyle); } catch (Exception e) { Report(e); } return; }
         if (tab != 0) { try { workspace.DrawControls(tab, textStyle, buttonStyle); } catch (Exception e) { Report(e); } return; }
         GUI.BeginGroup(new Rect(0, 50, Screen.width, Screen.height));
         GUI.Label(new Rect(35, 55, 745, 55), status, textStyle);
@@ -186,9 +252,56 @@ internal sealed class VRoid214Bridge : IDisposable
             if (copy)
                 GUIUtility.systemCopyBuffer = exportedPath;
             GUI.Label(new Rect(300, 210, 475, 52), "Save your .vroid to preserve imported edits.", textStyle);
+            GUI.enabled = previousEnabled && available;
+            if (GUI.Button(new Rect(35, 275, 235, 42), "Export UV guide", buttonStyle)) StartUVExport(layer);
+            if (GUI.Button(new Rect(285, 275, 235, 42), "Import linked PNG now", buttonStyle))
+            {
+                if (links.TryGetValue(Identity(layer.Path), out var linked))
+                {
+                    using var file = File.OpenRead(linked.File.FilePath);
+                    if (file.Length > 64 * 1024 * 1024) throw new InvalidDataException("PNG exceeds 64 MiB.");
+                    using var buffer = new MemoryStream(); file.CopyTo(buffer);
+                    if (Import(linked, buffer.ToArray())) status = "Imported linked PNG.";
+                }
+                else status = "Link this raster layer first.";
+            }
+            GUI.enabled = previousEnabled;
+            if (GUI.Button(new Rect(535, 275, 235, 42), "Open export folder", buttonStyle))
+            {
+                Directory.CreateDirectory(directory);
+                Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+            }
         }
         catch (Exception error) { Report(error); }
         GUI.EndGroup();
+    }
+
+    private void StartUVExport(RasterLayerViewModel layer)
+    {
+        if (uvExport != null) { status = "A UV export is already running."; return; }
+        TexturePath texturePath = null;
+        foreach (var path in layer._parent.ReferringTexturePaths) { texturePath = path; break; }
+        if (texturePath == null) { status = "This raster layer has no UV guide."; return; }
+        string folder = ExportFolder(); Directory.CreateDirectory(folder);
+        string name = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Identity(layer.Path).Texture + "\0" + Identity(layer.Path).Layer)));
+        uvOutput = Path.Combine(folder, name + "_UV.png"); uvSession = session;
+        uvExport = FindAvatar()._viewModel.CurrentFile.Engine.GetUVGuideTexturePNGBytes(texturePath);
+        status = "Preparing UV guide…";
+    }
+    private void FinishUVExport()
+    {
+        if (uvExport == null || !uvExport.IsCompleted) return;
+        var task = uvExport; uvExport = null;
+        if (uvSession != session) return;
+        if (task.IsFaulted || task.IsCanceled) throw new InvalidOperationException("UV guide generation failed.");
+        var result = task.Result;
+        if (result.Count > 64 * 1024 * 1024) throw new InvalidDataException("UV guide exceeds size limit.");
+        var array = new Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte>(result.Count);
+        result.CopyTo(array, 0);
+        var bytes = array.ToArray();
+        if (!PngGuard.IsCompleteBoundedPng(bytes)) throw new InvalidDataException("UV guide is not a bounded complete PNG.");
+        File.WriteAllBytes(uvOutput, bytes); GUIUtility.systemCopyBuffer = uvOutput;
+        status = "UV guide exported; its path was copied."; log.LogInfo("UV guide exported: " + uvOutput);
     }
 
     private LayerIdentity Identity(EditableImageRasterLayerPath path) => new(session,
@@ -212,6 +325,15 @@ internal sealed class VRoid214Bridge : IDisposable
         ExportPath(layer.Path, layer.TranslatedDisplayName);
     }
 
+    private string ExportFolder()
+    {
+        if (!groupByModel) return Path.Combine(directory, session);
+        string modelPath = document?.path ?? "unsaved";
+        string modelKey = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(modelPath.ToUpperInvariant())))[..16];
+        // Keep sessions distinct even inside a model folder to prevent old edits crossing a reopen.
+        return Path.Combine(directory, "model-" + modelKey, session);
+    }
+
     internal string ExportPath(EditableImageRasterLayerPath path, string label)
     {
         var context = document.engine.Context;
@@ -220,7 +342,7 @@ internal sealed class VRoid214Bridge : IDisposable
         var result = context.ExecuteSyncQuery<GetRasterLayerContentQuery.Result>(
             new GetRasterLayerContentQuery(path).Cast<ISyncQuery<GetRasterLayerContentQuery.Result>>());
         byte[] bytes = ImageEncodingUtil.EncodeToPNG(result.size, result.rgbaBytes).ToArray();
-        string folder = Path.Combine(directory, session);
+        string folder = ExportFolder();
         Directory.CreateDirectory(folder);
         // Hash complete structural identity, never translated display names.
         string name = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity.Texture + "\0" + identity.Layer)));
@@ -229,7 +351,7 @@ internal sealed class VRoid214Bridge : IDisposable
         exportedPath = filePath;
         if (links.Remove(identity, out var previous)) previous.File.Dispose();
         links.Add(identity, new LinkedLayer(path, label,
-            new SettledFileLink(identity, filePath, bytes, TimeSpan.FromMilliseconds(500))));
+            new SettledFileLink(identity, filePath, bytes, TimeSpan.FromMilliseconds(Math.Max(500, pollMilliseconds * 2)))));
         if (!ownsBackgroundSetting)
         {
             originalBackgroundSetting = Application.runInBackground;
@@ -337,10 +459,15 @@ internal sealed class VRoid214Bridge : IDisposable
         if (disposed) return;
         disposed = true;
         if (active == this) active = null;
+        cachedAvatar = null;
+        avatarSearchFrame = -1;
         harmony.UnpatchSelf();
         if (blockerCanvas != null) UnityEngine.Object.Destroy(blockerCanvas);
         ClearLinks();
         workspace.Dispose();
+        photoBooth.Dispose();
+        recording.Dispose();
+        rendering.Dispose();
         PublishSnapshot(false);
         editor = null;
         document = null;
