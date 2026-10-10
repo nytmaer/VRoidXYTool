@@ -16,14 +16,18 @@ namespace VRoidXYTool.MMD
         {
             Animator = animator ?? throw new ArgumentNullException(nameof(animator));
             originalAnimatorEnabled = animator.enabled;
-            Initialize();
+            try { Initialize(); }
+            catch { if (Animator != null) Animator.enabled = originalAnimatorEnabled; throw; }
         }
         public void Dispose()
         {
             IsPlaying = false;
+            morphPlayer?.Restore();
             boneGhost?.Destroy(); leftFootIK?.Destroy(); rightFootIK?.Destroy();
             leftToeIK?.Destroy(); rightToeIK?.Destroy();
             boneGhost = null; leftFootIK = null; rightFootIK = null; leftToeIK = null; rightToeIK = null;
+            morphPlayer = null; upperBodyAnimation = null; lowerBodyAnimation = null; centerAnimation = null; VMDReader = null;
+            nowPose.Clear(); nextPose.Clear();
             if (Animator != null) Animator.enabled = originalAnimatorEnabled;
         }
         public VMDReader VMDReader { get; private set; }
@@ -265,6 +269,7 @@ namespace VRoidXYTool.MMD
         //こいつがPlayの本体みたいなもの
         public void Play(VMDReader vmdReader)
         {
+            morphPlayer?.Restore();
             // Animator is supplied by the active photo booth.
             Animator.enabled = false;
 
@@ -298,8 +303,8 @@ namespace VRoidXYTool.MMD
         {
             Console.WriteLine($"从第{frameNumber}帧开始播放");
             if (frameNumber < 0) { frameNumber = 0; }
-            this.FrameNumber = frameNumber;
             Play(vmdReader);
+            JumpToFrame(frameNumber);
         }
 
         public void Play(string filePath)
@@ -1633,7 +1638,7 @@ namespace VRoidXYTool.MMD
                     //全てがnullになることはないはずだが一応
                     else if (faceKeyFrameGroup.LastMorphKeyFrame == null && faceKeyFrameGroup.NextMorphKeyFrame != null)
                     {
-                        float rate = faceKeyFrameGroup.NextMorphKeyFrame.Weight * (frameNumber / faceKeyFrameGroup.NextMorphKeyFrame.FrameNumber);
+                        float rate = faceKeyFrameGroup.NextMorphKeyFrame.Weight * ((float)frameNumber / faceKeyFrameGroup.NextMorphKeyFrame.FrameNumber);
                         morphDrivers[morphName].Morph(rate);
                     }
                 }
@@ -1646,17 +1651,28 @@ namespace VRoidXYTool.MMD
 
                 public SkinnedMeshRenderer SkinnedMeshRenderer { get; private set; }
                 public int MorphIndex { get; private set; }
+                private readonly float originalWeight;
 
                 public MorphDriver(SkinnedMeshRenderer skinnedMeshRenderer, int morphIndex)
                 {
                     SkinnedMeshRenderer = skinnedMeshRenderer;
                     MorphIndex = morphIndex;
+                    originalWeight = skinnedMeshRenderer.GetBlendShapeWeight(morphIndex);
                 }
 
                 public void Morph(float weightRate)
                 {
                     SkinnedMeshRenderer.SetBlendShapeWeight(MorphIndex, weightRate * MorphAmplifier);
                 }
+                public void Restore()
+                {
+                    if (SkinnedMeshRenderer != null) SkinnedMeshRenderer.SetBlendShapeWeight(MorphIndex, originalWeight);
+                }
+            }
+            public void Restore()
+            {
+                foreach (var driver in morphDrivers.Values) driver.Restore();
+                morphDrivers.Clear(); unityVMDMorphNameDictionary.Clear(); skinnedMeshRendererList.Clear();
             }
         }
     }

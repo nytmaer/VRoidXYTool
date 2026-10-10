@@ -67,6 +67,10 @@ try
     Reject(() => GuidePresets.Load(guideFile), "oversized guide preset rejected");
     byte[] jpegHeader = { 255,216,255,192,0,8,8,0,32,0,64,0,255,217 };
     Check(JpegGuard.IsBoundedJpeg(jpegHeader), "JPEG dimensions inspected before native allocation");
+    Check(JpegGuard.TryGetDimensions(jpegHeader,out int jpegWidth,out int jpegHeight) && jpegWidth==64 && jpegHeight==32,"JPEG budget uses actual decoded dimensions");
+    Check(ReferenceImageBudget.Validate(4096,4096,192L*1024*1024)==64L*1024*1024,"reference texture budget accepts its exact boundary");
+    Reject(()=>ReferenceImageBudget.Validate(4096,4096,192L*1024*1024+1),"combined reference texture memory cannot exceed 256 MiB");
+    Reject(()=>ReferenceImageBudget.Validate(int.MaxValue,int.MaxValue,0),"reference dimensions cannot overflow memory accounting");
     jpegHeader[9] = 17;
     Check(!JpegGuard.IsBoundedJpeg(jpegHeader), "JPEG wider than 4096 rejected");
     Check(!JpegGuard.IsBoundedJpeg(jpegHeader.AsSpan(0,10)), "truncated JPEG header rejected");
@@ -77,6 +81,24 @@ try
     emptyVmd[50]=255;emptyVmd[51]=255;emptyVmd[52]=255;emptyVmd[53]=127;
     Reject(()=>VmdGuard.Validate(emptyVmd),"VMD claimed keyframe count cannot overrun the input");
     Reject(()=>VmdGuard.Validate(new byte[58]),"invalid VMD signature rejected");
+    string legacyPose = Path.Combine(root,"legacy.posejson");
+    File.WriteAllText(legacyPose,"""
+        {"Data":{"HeadIK":{"TypeName":"SerializedHeadIK","Name":"HeadIK","FloatDict":{},"Vector3Dict":{},"QuaternionDict":{"CurrentRollRotation":{"x":0,"y":0,"z":0.2,"w":0.98}}}}}
+        """);
+    var controls = LegacyPoseImport.Read(legacyPose);
+    using(var merged=System.Text.Json.JsonDocument.Parse(LegacyPoseImport.MergeWithCurrent("{\"Name\":\"HeadIK\",\"StartDir\":{\"x\":0,\"y\":1,\"z\":0},\"CurrentRollRotation\":{\"x\":0,\"y\":0,\"z\":0,\"w\":1}}",controls[0].Value)))
+        Check(merged.RootElement.GetProperty("StartDir").GetProperty("y").GetSingle()==1 && merged.RootElement.GetProperty("CurrentRollRotation").GetProperty("z").GetSingle()==.2f,"partial legacy controls retain native fields while replacing imported values");
+    Reject(()=>LegacyPoseImport.MergeWithCurrent("{\"Name\":\"HeadIK\"}",controls[0].Value),"unsupported native pose members are rejected before application");
+    Check(controls.Count==1 && controls[0].Name=="HeadIK" && System.Text.Json.JsonDocument.Parse(controls[0].Value).RootElement.GetProperty("CurrentRollRotation").GetProperty("z").GetSingle()==.2f,"legacy pose control and quaternion retain their values");
+    string validLegacy = File.ReadAllText(legacyPose);
+    File.WriteAllText(legacyPose,validLegacy.Replace("SerializedHeadIK","ArbitraryRuntimeType"));
+    Reject(()=>LegacyPoseImport.Read(legacyPose),"unknown legacy pose types cannot be instantiated");
+    File.WriteAllText(legacyPose,validLegacy.Replace("0.2","1e30"));
+    Reject(()=>LegacyPoseImport.Read(legacyPose),"unbounded legacy pose values rejected");
+    File.WriteAllText(legacyPose,"{\"Data\":{}}");
+    Reject(()=>LegacyPoseImport.Read(legacyPose),"empty legacy poses rejected before native application");
+    File.WriteAllText(legacyPose,new string(' ',1024*1024+1));
+    Reject(()=>LegacyPoseImport.Read(legacyPose),"oversized legacy poses rejected");
 }
 finally { Directory.Delete(root, true); }
 

@@ -17,6 +17,7 @@ internal sealed class ReferenceWorkspace : IDisposable
         internal GameObject Object;
         internal Material Material;
         internal string Error;
+        internal long TextureBytes;
         public void Dispose() { if (Object != null) UnityEngine.Object.Destroy(Object); if (Material != null) UnityEngine.Object.Destroy(Material); if (Texture != null) UnityEngine.Object.Destroy(Texture); }
     }
     private readonly List<Image> images = new();
@@ -27,6 +28,7 @@ internal sealed class ReferenceWorkspace : IDisposable
     private AssetBundle bundle;
     private GameObject ruler;
     private bool screenGrid;
+    internal bool HasScreenContent => screenGrid || images.Any(item => !item.Data.WorldSpace && item.Data.Visible && item.Texture != null);
     internal string Message = "Paste an image path, then add a reference.";
     internal ReferenceWorkspace(string cameraPath) => presetPath = Path.Combine(Path.GetDirectoryName(cameraPath), "references.json");
     private static Vector3 V(Point3 p) => new(p.X, p.Y, p.Z);
@@ -44,7 +46,7 @@ internal sealed class ReferenceWorkspace : IDisposable
         if (bundle == null) throw new InvalidDataException("Reference asset bundle could not be loaded.");
     }
     private T Asset<T>(string name) where T : UnityEngine.Object { EnsureBundle(); return bundle.LoadAsset(name, Il2CppType.Of<T>()).TryCast<T>() ?? throw new InvalidDataException("Missing reference asset: " + name); }
-    private Image Load(GuideImagePreset data)
+    private Image Load(GuideImagePreset data, long pendingBytes = 0)
     {
         data.Validate();
         var item = new Image { Data = data };
@@ -55,8 +57,17 @@ internal sealed class ReferenceWorkspace : IDisposable
             using var memory = new MemoryStream(); stream.CopyTo(memory); byte[] bytes = memory.ToArray();
             bool png = Path.GetExtension(data.Path).Equals(".png", StringComparison.OrdinalIgnoreCase);
             if (!(png ? PngGuard.IsCompleteBoundedPng(bytes) : JpegGuard.IsBoundedJpeg(bytes))) throw new InvalidDataException("Invalid image or dimensions exceed 4096 pixels.");
+            int width, height;
+            if(png)
+            {
+                width=System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(16,4));
+                height=System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(20,4));
+            }
+            else JpegGuard.TryGetDimensions(bytes,out width,out height);
+            item.TextureBytes=ReferenceImageBudget.Validate(width,height,images.Sum(i=>i.TextureBytes)+pendingBytes);
             item.Texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-            if (!ImageConversion.LoadImage(item.Texture, bytes, false)) throw new InvalidDataException("Image cannot be decoded.");
+            // Reference images are display-only; release their CPU pixel copy.
+            if (!ImageConversion.LoadImage(item.Texture, bytes, true)) throw new InvalidDataException("Image cannot be decoded.");
             if (data.WorldSpace)
             {
                 item.Object = UnityEngine.Object.Instantiate(Asset<GameObject>("GuideImagePrefab")).TryCast<GameObject>();
@@ -107,7 +118,7 @@ internal sealed class ReferenceWorkspace : IDisposable
         {
             foreach (var entry in data.Images)
             {
-                try { loaded.Add(Load(entry)); }
+                try { loaded.Add(Load(entry,loaded.Sum(i=>i.TextureBytes))); }
                 catch (Exception error) { loaded.Add(new Image { Data = entry, Error = error.Message }); }
             }
             if (data.WorldGrid) SetRuler(true);
@@ -165,7 +176,14 @@ internal sealed class ReferenceWorkspace : IDisposable
                 if (item.Data.WorldSpace || !item.Data.Visible || item.Texture == null) continue;
                 float width = area.width * item.Data.Scale, height = width * item.Texture.height / item.Texture.width;
                 GUI.color = new Color(1,1,1,item.Data.Alpha);
-                GUI.DrawTexture(new Rect(area.width*item.Data.Position.X-width/2,area.height*item.Data.Position.Y-height/2,width,height),item.Texture,ScaleMode.ScaleToFit,true);
+                var matrix = GUI.matrix;
+                try
+                {
+                    var center = new Vector2(area.width*item.Data.Position.X,area.height*item.Data.Position.Y);
+                    GUIUtility.RotateAroundPivot(item.Data.Rotation.Z, center);
+                    GUI.DrawTexture(new Rect(center.x-width/2,center.y-height/2,width,height),item.Texture,ScaleMode.ScaleToFit,true);
+                }
+                finally { GUI.matrix = matrix; }
             }
             if (screenGrid)
             {

@@ -4,7 +4,10 @@ public static class JpegGuard
 {
     // Check dimensions before the native decoder allocates its texture.
     public static bool IsBoundedJpeg(ReadOnlySpan<byte> bytes)
+        => TryGetDimensions(bytes, out _, out _);
+    public static bool TryGetDimensions(ReadOnlySpan<byte> bytes, out int width, out int height)
     {
+        width = height = 0;
         if (bytes.Length < 12 || bytes.Length > 64 * 1024 * 1024 || bytes[0] != 255 || bytes[1] != 216 || bytes[^2] != 255 || bytes[^1] != 217) return false;
         int offset = 2;
         while (offset + 3 < bytes.Length)
@@ -21,8 +24,8 @@ public static class JpegGuard
             if (marker is 192 or 193 or 194)
             {
                 if (length < 8) return false;
-                int height = bytes[offset + 3] * 256 + bytes[offset + 4];
-                int width = bytes[offset + 5] * 256 + bytes[offset + 6];
+                height = bytes[offset + 3] * 256 + bytes[offset + 4];
+                width = bytes[offset + 5] * 256 + bytes[offset + 6];
                 return width is > 0 and <= 4096 && height is > 0 and <= 4096;
             }
             offset += length;

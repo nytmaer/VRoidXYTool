@@ -1,6 +1,6 @@
 # Local completion checklist
 
-The user authorized publishing this work to the repository on October 9, 2026. Publish the feature branch for review; merging to main and releasing binaries still require final approval.
+The user authorized repository publication on October 9, 2026 and approved merging to main on October 10, 2026 after being informed that live acceptance remains incomplete. This approval does not mark the pending checks complete. Publishing release binaries still requires separate approval.
 
 Incremental native results and remaining checks are recorded in [WORKSPACE_NATIVE_ACCEPTANCE.md](WORKSPACE_NATIVE_ACCEPTANCE.md).
 
@@ -12,6 +12,7 @@ Incremental native results and remaining checks are recorded in [WORKSPACE_NATIV
 - [ ] VMD: load, play/pause/stop/loop, current rig, cleanup
 - [x] Recording: capture, FPS/bitrate, hotkey stop, photo-booth exit and normal shutdown finalization; encoder failure preserves partial output (hard-crash recovery is not implemented)
 - [ ] Common UI: configuration, shortcuts, compact/repositionable panel, localization
+- [ ] Performance/memory: allocation regression and code review completed locally; live CPU/memory measurements and repeated document/motion cleanup remain pending (see PERFORMANCE.md)
 - [ ] Core tests, native acceptance, regression and final review package
 
 Installer work remains deferred by the user's earlier instruction. Feature parity audit is in the local `codex/feature-parity-audit` branch, commit fa2dbe3; current implementation branch is `codex/complete-feature-parity`.

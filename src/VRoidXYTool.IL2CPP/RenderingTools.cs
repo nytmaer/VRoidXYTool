@@ -11,6 +11,9 @@ internal sealed class RenderingTools : IDisposable
     private readonly Dictionary<IntPtr,(Camera Camera,CameraClearFlags Flags)> wireCameras=new();
     private int? originalAA;
     private bool wire;
+    private readonly HashSet<IntPtr> modelCameras = new();
+    private int modelCameraFrame = -1;
+    private static readonly int[] SampleLevels = {0,2,4,8};
     private Camera.CameraCallback before,after;
     internal string Message="Rendering changes are restored when disabled or when the model closes.";
     private static IEnumerable<CameraGroup> Groups()
@@ -18,12 +21,22 @@ internal sealed class RenderingTools : IDisposable
         foreach(var view in UnityEngine.Object.FindObjectsOfType<VRoidStudio.GUI.UserControls.VRoidStudioAvatarCameraViewController>())
             if(view.gameObject.activeInHierarchy && view.cameraPosition?._multipleRenderTextureCamera!=null)
                 foreach(var group in view.cameraPosition._multipleRenderTextureCamera.InstantiatedCameras.Keys)yield return group;
+        var avatar=VRoid214Bridge.FindAvatar();
+        var photo=avatar?._instantiatedPhotoBoothViewModel;
+        var photoCameras=avatar?._viewModel?.GlobalBus.PhotoBoothAvatarCameraPosition?._multipleRenderTextureCamera;
+        if(photo?.IsActive==true && photoCameras!=null)
+            foreach(var group in photoCameras.InstantiatedCameras.Keys)yield return group;
     }
-    private static bool ModelCamera(Camera camera)
+    private bool ModelCamera(Camera camera)
     {
-        foreach(var group in Groups())if(group.PrimaryCamera?.Pointer==camera.Pointer)return true;
-        var photo=VRoid214Bridge.FindAvatar()?._instantiatedPhotoBoothViewModel;
-        return photo?.IsActive==true && photo.PhotoBoothCamera?.Pointer==camera.Pointer;
+        if(modelCameraFrame!=Time.frameCount)
+        {
+            modelCameraFrame=Time.frameCount;modelCameras.Clear();
+            foreach(var group in Groups())if(group.PrimaryCamera!=null)modelCameras.Add(group.PrimaryCamera.Pointer);
+            var photo=VRoid214Bridge.FindAvatar()?._instantiatedPhotoBoothViewModel;
+            if(photo?.IsActive==true && photo.PhotoBoothCamera!=null)modelCameras.Add(photo.PhotoBoothCamera.Pointer);
+        }
+        return modelCameras.Contains(camera.Pointer);
     }
     private void Pre(Camera camera)
     {
@@ -80,13 +93,14 @@ internal sealed class RenderingTools : IDisposable
         if(GUI.Button(new Rect(35,112,355,36),wire?"Disable wireframe":"Enable wireframe",button))Run(()=>SetWire(!wire));
         if(GUI.Button(new Rect(405,112,355,36),"Restore rendering",button))Run(Dispose);
         GUI.Label(new Rect(35,170,740,36),"Anti-aliasing",text);
-        int[] levels={0,2,4,8};
+        var levels=SampleLevels;
         for(int i=0;i<levels.Length;i++){int samples=levels[i];if(GUI.Button(new Rect(35+i*185,210,175,36),samples==0?"Off":samples+"×",button))Run(()=>AntiAlias(samples));}
         GUI.Label(new Rect(35,270,740,140),Message,text);
     }
     public void Dispose()
     {
         SetWire(false);
+        modelCameras.Clear();modelCameraFrame=-1;
         foreach(var entry in textures.Values)if(entry.Texture!=null)Samples(entry.Texture,entry.Samples);
         textures.Clear();
         foreach(var entry in cameras.Values)if(entry.Camera!=null){entry.Camera.allowMSAA=entry.MSAA;entry.Camera.allowHDR=entry.HDR;}

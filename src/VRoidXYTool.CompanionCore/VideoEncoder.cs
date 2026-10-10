@@ -18,6 +18,7 @@ public sealed class VideoEncoder : IDisposable
     private Task<string>? completion;
     private int stopped, dropped;
     public int DroppedFrames => Volatile.Read(ref dropped);
+    public bool CanAcceptFrame => Volatile.Read(ref stopped)==0 && (writer.IsFaulted || queue.Count<queue.BoundedCapacity);
     public VideoEncoder(string executable,string output,int width,int height,int fps,int bitrate)
     {
         if(!File.Exists(executable))throw new FileNotFoundException("Configure an existing FFmpeg executable for recording.",executable);

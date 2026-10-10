@@ -9,7 +9,7 @@ using VRoidStudio.GUI.UserControls;
 
 namespace VRoidXYTool.IL2CPP;
 
-// Editor-only views and screen references. These never execute model-editing commands.
+// Editing and photo-booth views/references; these never execute model-editing commands.
 internal sealed class WorkspaceTools : IDisposable
 {
     private readonly ManualLogSource log;
@@ -144,8 +144,9 @@ internal sealed class WorkspaceTools : IDisposable
     }
     internal void DrawGuides()
     {
-        if (Controller() == null) return;
+        if (Event.current.type != EventType.Repaint || !references.HasScreenContent) return;
         var controller = Controller();
+        if (controller == null) return;
         foreach (var view in UnityEngine.Object.FindObjectsOfType<VRoidStudioAvatarCameraViewController>())
         {
             if (!view.gameObject.activeInHierarchy || view.cameraPosition?.Pointer != controller.Pointer) continue;

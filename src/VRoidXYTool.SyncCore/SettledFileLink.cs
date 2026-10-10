@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Buffers;
 
 namespace VRoidXYTool.SyncCore;
 
@@ -45,6 +46,7 @@ public sealed class SettledFileLink : IDisposable
         if (elapsed < lastPoll) throw new ArgumentOutOfRangeException(nameof(elapsed));
         lastPoll = elapsed;
         byte[] bytes;
+        string hash;
         try
         {
             // Exclusive reads retry locked saves, including editors that replace files by rename.
@@ -55,6 +57,19 @@ public sealed class SettledFileLink : IDisposable
                 candidateHash = null;
                 return false;
             }
+            // Hash directly from the stream. Unchanged files must not allocate
+            // a complete PNG buffer every polling interval.
+            hash = Hash(stream);
+            if (hash == appliedHash) { Status = "Synced"; candidateHash = null; return false; }
+            if (hash != candidateHash)
+            {
+                candidateHash = hash;
+                candidateSince = elapsed;
+                Status = "Waiting for save to settle";
+                return false;
+            }
+            if (elapsed - candidateSince < quietPeriod) return false;
+            stream.Position = 0;
             bytes = new byte[checked((int)stream.Length)];
             var offset = 0;
             while (offset < bytes.Length)
@@ -67,16 +82,9 @@ public sealed class SettledFileLink : IDisposable
         catch (IOException) { Status = "File missing or busy"; candidateHash = null; return false; }
         catch (UnauthorizedAccessException) { Status = "File access denied"; candidateHash = null; return false; }
 
-        string hash = Hash(bytes);
-        if (hash == appliedHash) { Status = "Synced"; candidateHash = null; return false; }
-        if (hash != candidateHash)
-        {
-            candidateHash = hash;
-            candidateSince = elapsed;
-            Status = "Waiting for save to settle";
-            return false;
-        }
-        if (elapsed - candidateSince < quietPeriod) return false;
+        // Preserve exact-byte acknowledgement even if a writer on another
+        // platform ignores the exclusive share mode during the two reads.
+        if (Hash(bytes) != hash) { candidateHash = null; Status = "Waiting for save to settle"; return false; }
         if (!apply(Identity, bytes)) { Status = "Import deferred"; return false; }
         // Commit only the bytes actually imported. A subsequent external save is caught next poll.
         appliedHash = hash;
@@ -95,4 +103,18 @@ public sealed class SettledFileLink : IDisposable
 
     public void Dispose() { disposed = true; candidateHash = null; }
     private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
+    private static string Hash(Stream stream)
+    {
+        // Large pooled reads avoid both full-image allocations and small-read
+        // overhead; the buffer is returned even if a cloud-backed read fails.
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
+        try
+        {
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            int read;
+            while ((read = stream.Read(buffer, 0, buffer.Length)) > 0) hash.AppendData(buffer, 0, read);
+            return Convert.ToHexString(hash.GetHashAndReset());
+        }
+        finally { ArrayPool<byte>.Shared.Return(buffer); }
+    }
 }

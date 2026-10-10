@@ -69,6 +69,8 @@ internal sealed class RecordingTools : IDisposable
     {
         if(!starting && (encoder==null || finishing!=null))return;
         if(!starting && clock.Elapsed.TotalSeconds<next)return;
+        // Skip the GPU readback and frame allocations under encoder backpressure.
+        if(!starting && !encoder.CanAcceptFrame)return;
         Texture2D texture=null;
         try
         {
