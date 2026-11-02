@@ -16,7 +16,7 @@ QuitAfterSeconds = 0
 Enabled = true
 ```
 
-The bridge requires Application.version `2.14.0`. Other versions log a warning and leave texture integration disabled. Bootstrap logging remains available. The default PNG directory is `<test application>/LinkTextureIL2CPP`; `TextureSync.Directory` can override it.
+The bridge accepts Application.version `2.14.0` or `2.16.0` with Unity `6000.0.62f1`. Other application/engine combinations log a warning and leave texture integration disabled. Bootstrap logging remains available. The default PNG directory is `<test application>/LinkTextureIL2CPP`; `TextureSync.Directory` can override it. See `VROID_216_COMPATIBILITY.md` for the October 30 validation.
 
 Launch `.local/VRoidStudio/VRoidStudio.exe` interactively. The installed Steam copy remains unchanged. The test copy shares per-user preferences/login state with the installed application.
 

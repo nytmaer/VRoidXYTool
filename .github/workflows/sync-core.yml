@@ -15,3 +15,13 @@ jobs:
       - run: dotnet run --project tests/VRoidXYTool.CompanionCore.Tests -c Release -p:NuGetAudit=false
       - run: dotnet run --project tests/VRoidXYTool.Performance.Tests -c Release -p:NuGetAudit=false
       - run: dotnet build src/VRoidXYTool.Companion -c Release -p:NuGetAudit=false
+      - run: dotnet run --project tests/VRoidXYTool.Compatibility.Tests -c Release -p:NuGetAudit=false
+      - run: dotnet build tests/VRoidXYTool.Launcher.Tests -c Release -p:NuGetAudit=false
+      - run: dotnet build tests/VRoidXYTool.Setup.Tests -c Release -p:NuGetAudit=false
+      - name: Compile launcher with a nonshipping fixture payload
+        shell: pwsh
+        run: |
+          $fixture = Join-Path $env:RUNNER_TEMP 'compile-only-payload.zip'
+          Compress-Archive -LiteralPath README.md -DestinationPath $fixture
+          dotnet build src/VRoidXYTool.Launcher -c Release "-p:PayloadPath=$fixture" -p:NuGetAudit=false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

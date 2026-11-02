@@ -1,8 +1,8 @@
-# VRoidXYTool — IL2CPP port for VRoid Studio 2.14
+# VRoidXYTool — IL2CPP port for VRoid Studio 2.14 and 2.16
 
 A port of [xiaoye97/VRoidXYTool](https://github.com/xiaoye97/VRoidXYTool) to current VRoid Studio.
 
-The original plugin stopped working when VRoid Studio 1.26.1 switched from Mono to IL2CPP. This fork rebuilds its core workflow, live texture linking, for **VRoid Studio 2.14.0** on **BepInEx 6 (IL2CPP)**. It also adds a second-monitor Companion and edit-mode camera and reference tools.
+The original plugin stopped working when VRoid Studio 1.26.1 switched from Mono to IL2CPP. This fork rebuilds its core workflow, live texture linking, for **VRoid Studio 2.14.0 and 2.16.0 / Unity 6000.0.62f1** on **BepInEx 6 (IL2CPP)**. It also adds a second-monitor Companion and edit-mode camera and reference tools.
 
 > **Credit.** VRoidXYTool was created by xiaoye97 and released under the MIT license. The original source, license and attribution are kept in this repository. For the original plugin and its Chinese documentation, see the [upstream repository](https://github.com/xiaoye97/VRoidXYTool).
 
@@ -12,12 +12,18 @@ This plugin is free. It must not be sold in any form.
 
 **Experimental.** It works on the tested setup below, but no release binaries are published yet. You build it yourself, and you should test on copies of the app and your models.
 
+October 30: the 2.16.0 compatibility pass verified native PNG import, Undo/Redo, save/reopen and isolation, plus camera, grid, wireframe and photo-booth smoke checks with the new Performance Monitor. See the [2.16 compatibility report](docs/VROID_216_COMPATIBILITY.md) for the exact coverage and limits. Unknown VRoid or Unity versions remain disabled.
+
+The [managed workspace launcher](docs/LAUNCHER_GUIDE.md) is in development. It replaces manual folder/bridge setup with detection, managed application copies, connected launching and repair. It compiles, but the published single-file build and complete first-run UI acceptance are not finished. See [launcher development status](docs/LAUNCHER_STATUS.md) before trying it.
+
 | Feature | Status |
 | --- | --- |
 | Live texture linking | Ported. Link raster layers, edit the PNGs in Krita or another editor, and saves sync into VRoid automatically |
 | Camera presets | Expanded implementation: ten slots per projection, clear, size/rotation, legacy import and photo-booth access. Full native acceptance pending |
 | Reference guides | Expanded implementation: multiple PNG/JPG references, screen/world placement, ruler/grid and saved presets. Full native acceptance pending |
 | Second-monitor Companion | New. A separate window listing linked layers with live thumbnails and sync status |
+| Texture snapshots and character projects | Implemented locally: named PNG versions, comparison/restore with recovery copies, independent image archives and persistent notes. Core workflows and document-session safeguards tested |
+| Managed workspace launcher | In development. Compile and file-integration checks; full first-run native acceptance pending |
 | Pose presets | Native save/load/reset tested. Legacy `.posejson` migration and remaining dialog/deletion checks pending |
 | MMD/VMD player | Implemented; head-turn playback, loop, pause, seek, stop and photo-booth exit tested. Broader motion coverage pending |
 | MP4 recording | Tested silent H.264 capture with configurable FPS/bitrate, hotkey stop and automatic finalization. Requires external FFmpeg |
@@ -37,7 +43,7 @@ Feature parity remains in progress. The [completion checklist](docs/LOCAL_COMPLE
 ## Requirements
 
 - Windows x64
-- VRoid Studio **2.14.0**. On any other version, the plugin disables itself.
+- VRoid Studio **2.14.0 or 2.16.0**, Unity **6000.0.62f1**. On other application/engine combinations, the editor bridge stays disabled.
 - [BepInEx 6.0.0-be.788 (Unity IL2CPP, win-x64)](https://builds.bepinex.dev/projects/bepinex_be/788/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.788%2B5b766a3.zip). Don't install it over an old BepInEx 5 setup.
 - .NET SDK with .NET 6 targeting packs to build the plugin
 - .NET 10 Windows Desktop runtime, for the Companion only
@@ -69,7 +75,7 @@ Full details:
 
 ## Known limits
 
-- Tested only on VRoid Studio 2.14.0 with Krita, on one Windows two-monitor setup. Photoshop saves and other monitor/DPI arrangements are not yet verified.
+- Krita workflows were tested on VRoid Studio 2.14.0; the native document diagnostic and selected workspace smoke tests also pass on 2.16.0. Photoshop saves, broader 2.16 feature coverage and other monitor/DPI arrangements are not yet verified.
 - PNGs are limited to 4096×4096 and 64 MiB.
 - Expanded camera/reference, pose, VMD and rendering features have incomplete native acceptance; see the linked checklist.
 - Recording needs an existing FFmpeg executable with `libx264`. Hard-crash recording recovery is not implemented.

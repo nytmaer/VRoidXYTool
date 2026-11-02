@@ -31,9 +31,11 @@ internal sealed class CompanionWindow : Window
     private readonly ListView layers = new() { Background = Brush("#19212D"), Foreground = Brushes.White, BorderThickness = new Thickness(0), Margin = new Thickness(0, 20, 0, 20) };
     private readonly Button open = Button("Open PNG in editor");
     private readonly Button copy = Button("Copy PNG path");
+    private readonly Button history = Button("Texture snapshots");
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(1) };
     private string? statePath;
     private string? editorPath;
+    private string? projectPath;
     private BridgeSnapshot? snapshot;
     private readonly string preferencesPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VRoidXYTool", "Companion", "settings.json");
     private readonly Dictionary<string, (DateTime Modified, long Length, ImageSource Image)> thumbnails = new();
@@ -52,6 +54,7 @@ internal sealed class CompanionWindow : Window
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var header = new DockPanel();
         var choose = Button("Choose bridge file"); DockPanel.SetDock(choose, Dock.Right); header.Children.Add(choose);
+        var dashboard = Button("Character project"); DockPanel.SetDock(dashboard, Dock.Right); header.Children.Add(dashboard);
         var title = new StackPanel(); title.Children.Add(Text("VROID COMPANION", 12, FontWeights.Bold));
         title.Children.Add(Text("Linked textures", 30, FontWeights.SemiBold)); header.Children.Add(title); root.Children.Add(header);
         var summary = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
@@ -83,7 +86,7 @@ internal sealed class CompanionWindow : Window
         hovered.Setters.Add(new Setter(Control.ForegroundProperty, Brush("#101620")));
         rowStyle.Triggers.Add(hovered); layers.ItemContainerStyle = rowStyle;
         var footer = new StackPanel();
-        var actions = new WrapPanel(); actions.Children.Add(open); actions.Children.Add(copy);
+        var actions = new WrapPanel(); actions.Children.Add(open); actions.Children.Add(copy); actions.Children.Add(history);
         var chooseEditor = Button("Choose editor"); actions.Children.Add(chooseEditor);
         var defaultEditor = Button("Use default app"); actions.Children.Add(defaultEditor); footer.Children.Add(actions);
         footer.Children.Add(editorLabel); footer.Children.Add(feedback);
@@ -91,15 +94,26 @@ internal sealed class CompanionWindow : Window
         Grid.SetRow(footer, 3); root.Children.Add(footer); Content = root;
         var preferences = CompanionPreferences.Load(preferencesPath);
         statePath = preferences.BridgePath;
+        projectPath = preferences.ProjectPath;
         editorPath = preferences.EditorPath;
         if (!preferences.UseDefaultEditor && string.IsNullOrWhiteSpace(editorPath))
             editorPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Krita (x64)", "bin", "krita.exe");
         if (preferences.UseDefaultEditor || !File.Exists(editorPath)) editorPath = null;
         UpdateEditorLabel();
         choose.Click += (_, _) => ChooseState();
+        dashboard.Click += (_, _) => new CharacterProjectWindow(projectPath, () => statePath, path =>
+        {
+            projectPath = path; SavePreferences();
+        }) { Owner = this }.ShowDialog();
         chooseEditor.Click += (_, _) => ChooseEditor();
         defaultEditor.Click += (_, _) => { editorPath = null; UpdateEditorLabel(); SavePreferences(); };
         open.Click += (_, _) => OpenSelected();
+        history.Click += (_, _) => RunAction(() =>
+        {
+            SelectedPng();
+            var current = SnapshotFile.Read(statePath!);
+            new TextureHistoryWindow(statePath!, current.DocumentSession!, ((LayerRow)layers.SelectedItem).Id) { Owner = this }.ShowDialog();
+        });
         copy.Click += (_, _) => RunAction(() => { Clipboard.SetText(SelectedPng()); feedback.Text = "PNG path copied."; });
         layers.SelectionChanged += (_, _) => UpdateActions();
         timer.Tick += (_, _) => RefreshState();
@@ -124,7 +138,7 @@ internal sealed class CompanionWindow : Window
 
     private void SavePreferences()
     {
-        try { new CompanionPreferences { BridgePath = statePath, EditorPath = editorPath, UseDefaultEditor = editorPath == null }.Save(preferencesPath); }
+        try { new CompanionPreferences { BridgePath = statePath, EditorPath = editorPath, UseDefaultEditor = editorPath == null, ProjectPath = projectPath }.Save(preferencesPath); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { feedback.Text = "Settings could not be saved: " + error.Message; }
     }
 
@@ -189,7 +203,7 @@ internal sealed class CompanionWindow : Window
         UpdateActions();
     }
 
-    private void UpdateActions() => open.IsEnabled = copy.IsEnabled = snapshot != null && layers.SelectedItem != null && SnapshotFile.IsLive(snapshot, DateTimeOffset.UtcNow);
+    private void UpdateActions() => open.IsEnabled = copy.IsEnabled = history.IsEnabled = snapshot != null && layers.SelectedItem != null && SnapshotFile.IsLive(snapshot, DateTimeOffset.UtcNow);
     private string SelectedPng()
     {
         // Re-read immediately before opening: selection may belong to a closed/replaced document.
