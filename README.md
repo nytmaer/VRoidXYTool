@@ -1,96 +1,127 @@
-# VRoidXYTool — IL2CPP port for VRoid Studio 2.14 and 2.16
+# VRoidXYTool
 
-A port of [xiaoye97/VRoidXYTool](https://github.com/xiaoye97/VRoidXYTool) to current VRoid Studio.
+Edit a VRoid texture in your image editor, save the PNG, and see the change in VRoid. The optional Companion shows linked layers on another monitor and provides texture snapshots, project notes, and image archives.
 
-The original plugin stopped working when VRoid Studio 1.26.1 switched from Mono to IL2CPP. This fork rebuilds its core workflow, live texture linking, for **VRoid Studio 2.14.0 and 2.16.0 / Unity 6000.0.62f1** on **BepInEx 6 (IL2CPP)**. It also adds a second-monitor Companion and edit-mode camera and reference tools.
+**Windows x64 · VRoid Studio 2.14.0 or 2.16.0 · Unity 6000.0.62f1**
 
-> **Credit.** VRoidXYTool was created by xiaoye97 and released under the MIT license. The original source, license and attribution are kept in this repository. For the original plugin and its Chinese documentation, see the [upstream repository](https://github.com/xiaoye97/VRoidXYTool).
+## Start here
+
+**There is no public installer release yet.** GitHub's **Code → Download ZIP** downloads source code; it does not install the tool. This project is experimental. The new simplified launcher is still awaiting complete first-run testing.
+
+| What you have | Follow these directions |
+| --- | --- |
+| Only this GitHub repository | **Install from source**, below. |
+| A separately provided `VRoidXYTool-Setup.exe` candidate | **Install using the Setup candidate**, below. Local packages are not attached to a public release. |
+| A development `VRoidXYTool.exe` launcher | Read the [launcher guide](docs/LAUNCHER_GUIDE.md) and [development status](docs/LAUNCHER_STATUS.md). Full native setup/launch acceptance is pending. |
+
+Use a copy of the VRoid application and a copy of your `.vroid` model for the first test. Application copies still share VRoid's normal per-user preferences and custom items.
+
+## Install using the Setup candidate
+
+Use this path only if you were given the local **0.3.1 Setup candidate**.
+
+1. Save your work and close VRoid and the Companion.
+2. Run **VRoidXYTool-Setup.exe**.
+3. Select your existing **VRoidStudio.exe**. Use **Browse…** for custom drives or folders.
+4. Leave **Install into a separate writable copy (recommended)** checked. Choose an empty installation folder and a separate writable artwork/data folder, or keep the defaults.
+5. Click **Check setup**, then **Install / repair**. Internet is required when Setup downloads its verified BepInEx loader.
+6. Click **Open installed VRoid**. Allow the first startup to generate integration files before launching another instance.
+7. Follow **Activate texture linking** below. Use **Open Companion** if you want the second window.
+
+The Setup candidate and its Companion include their .NET runtimes. No SDK or separate .NET installation is needed for this packaged route. VRoid, an image editor, and FFmpeg are not bundled.
+
+For later sessions, run `VRoidStudio.exe` from your **chosen installation folder**. The original Steam shortcut may open the unmodified application instead. The Companion is at `VRoidXYTool/Companion/VRoidXYTool.Companion.exe` inside the installed copy.
+
+The local candidate is unsigned. If Windows blocks it, retain the exact message for troubleshooting without disabling security settings. See the [full installation guide](docs/INSTALL_GUIDE.md) for upgrades, repair, troubleshooting, and uninstalling.
+
+## Install from source
+
+You need a supported VRoid installation, an image editor, and the **.NET 10 SDK**. Building the plugin also requires .NET 6 targeting/reference packs. Clone or download this repository, extract it if needed, and run the following commands from its root folder.
+
+### 1. Prepare a clean application copy
+
+Copy the VRoid application into a writable folder. Keep model backups separately.
+
+Download the pinned [BepInEx 6.0.0-be.788 — Unity IL2CPP, Windows x64](https://builds.bepinex.dev/projects/bepinex_be/788/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.788%2B5b766a3.zip). Extract it into the copied application folder, beside `VRoidStudio.exe`.
+
+Use a clean loader installation. Do not extract BepInEx 6 over BepInEx 5 or an unknown loader. See [bootstrap preparation](docs/IL2CPP_BOOTSTRAP.md) for the exact application files and pinned dependency details.
+
+Start the copied `VRoidStudio.exe` once. First startup may need internet and several minutes while BepInEx generates its interop assemblies. Wait for startup to finish, then close VRoid.
+
+### 2. Build and copy the plugin
+
+Replace both example paths with the actual paths inside your copied application:
+
+```powershell
+dotnet build src/VRoidXYTool.IL2CPP -c Release -p:BepInExRoot="C:/YourVRoidCopy/BepInEx" -p:InteropRoot="C:/YourVRoidCopy/BepInEx/interop"
+```
+
+Create `BepInEx/plugins/VRoidXYTool.IL2CPP/` inside the copied application. Copy these three files from `src/VRoidXYTool.IL2CPP/bin/Release/net6.0/` into it:
+
+- `VRoidXYTool.IL2CPP.dll`
+- `VRoidXYTool.SyncCore.dll`
+- `VRoidXYTool.CompanionCore.dll`
+
+Launch the copied `VRoidStudio.exe` again. The plugin loads automatically through BepInEx. **Tab** shows or hides its workspace panel.
+
+### 3. Build the optional Companion
+
+```powershell
+dotnet build src/VRoidXYTool.Companion -c Release
+```
+
+Run `VRoidXYTool.Companion.exe` from `src/VRoidXYTool.Companion/bin/Release/net10.0-windows/`. This framework-dependent build requires the **.NET 10 Windows Desktop runtime**.
+
+Click **Choose bridge file** in the Companion. For a default manual installation, select:
+
+```text
+<your copied VRoid folder>/Companion/bridge-state.json
+```
+
+Launch VRoid with the plugin first so the file exists. If you customized `Companion.StatePath`, select that configured file instead. Setup-installed copies normally use `<chosen data folder>/Bridge/bridge-state.json`.
+
+## Activate texture linking
+
+**No license key or separate activation account is required.** Loading the plugin displays the workspace; linking a layer starts synchronization for that layer.
+
+1. Open a **test copy** of your `.vroid` model in the copied VRoid application.
+2. Choose the material, enter **Edit Texture**, and select a **raster layer**.
+3. Show the workspace with **Tab**, open **Textures**, and click **Link / export selected**.
+4. Click **Copy linked PNG path** or **Open export folder**. Open that exact PNG in Krita or your image editor.
+5. Make a small test edit. Preserve dimensions and transparency, then save as **PNG**.
+6. Confirm the edit appears in VRoid. If necessary, click **Import linked PNG now**. Native Undo/Redo should work for the imported edit.
+7. **Save the `.vroid` model in VRoid.** Saving only the PNG does not save the model.
+
+In the Companion, select the linked layer, use **Choose editor**, then **Open PNG in editor**. A second monitor is optional.
+
+Opening or reopening a document clears its links. Select and link the layer again for each session. **Unlink all** stops syncing and keeps exported files. Reexporting can replace the linked PNG with current VRoid pixels, so preserve unsaved editor work first.
+
+## If it does not work
+
+| Problem | What to check |
+| --- | --- |
+| No workspace panel | Start the copied executable, press **Tab**, and inspect `<copied VRoid folder>/BepInEx/LogOutput.log`. Check that the three plugin DLLs are in the correct plugin folder. |
+| Unsupported version | Use exactly **2.14.0 or 2.16.0** with Unity **6000.0.62f1**. Other application/engine combinations deliberately leave the editor bridge disabled. |
+| Sync disabled or panel hidden | In `BepInEx/config/io.github.nytmaer.vroidxytool.il2cpp.cfg`, check `[TextureSync] Enabled = true` and `ShowControlsOnStartup = true`, then restart the copied application. |
+| Cannot link a layer | Enter **Edit Texture** and select a raster layer. Hide the overlay with **Tab** when it covers native controls. |
+| PNG saves do not appear | Save the exact linked PNG, let the write finish, and try **Import linked PNG now**. Relink after document changes. PNG limits: **4096×4096**, **64 MiB**. |
+| Companion offline or empty | Confirm VRoid is running with the plugin, select the correct bridge file, and link a layer. |
+| First startup is slow | Wait for interop generation and inspect the startup log before launching additional instances. |
+
+For normal use, leave `[Diagnostics] ModelPath` blank and `QuitAfterSeconds = 0`. Review logs before sharing them; they can contain account information.
+
+## Other tools and current limits
+
+- [Texture snapshots and character projects](docs/CHARACTER_PROJECTS.md): compare/restore PNG versions, retain recovery copies, and keep independent images and notes.
+- [Companion](docs/COMPANION.md): thumbnails, sync status, and external-editor access.
+- [Camera presets and reference guides](docs/WORKSPACE_TOOLS.md).
+- [MP4 recording](docs/RECORDING.md): requires your own FFmpeg executable with `libx264`.
+- [VRoid 2.16 compatibility results](docs/VROID_216_COMPATIBILITY.md), [native acceptance](docs/WORKSPACE_NATIVE_ACCEPTANCE.md), and [remaining work](docs/LOCAL_COMPLETION_CHECKLIST.md).
+
+The 2.16 native texture diagnostic and selected workspace smoke tests passed. Full 2.16 VMD/MP4 coverage, broader editor/DPI testing, and the new launcher's complete first-run workflow remain pending. No public stable release is claimed.
+
+## Credits and license
+
+This fork modernizes [xiaoye97/VRoidXYTool](https://github.com/xiaoye97/VRoidXYTool), whose legacy plugin stopped working after VRoid switched from Mono to IL2CPP. Original source and attribution remain in this repository. See [LICENSE](LICENSE) and the upstream project for its original documentation.
 
 This plugin is free. It must not be sold in any form.
-
-## Status
-
-**Experimental.** It works on the tested setup below, but no release binaries are published yet. You build it yourself, and you should test on copies of the app and your models.
-
-October 30: the 2.16.0 compatibility pass verified native PNG import, Undo/Redo, save/reopen and isolation, plus camera, grid, wireframe and photo-booth smoke checks with the new Performance Monitor. See the [2.16 compatibility report](docs/VROID_216_COMPATIBILITY.md) for the exact coverage and limits. Unknown VRoid or Unity versions remain disabled.
-
-The [managed workspace launcher](docs/LAUNCHER_GUIDE.md) is in development. It replaces manual folder/bridge setup with detection, managed application copies, connected launching and repair. It compiles, but the published single-file build and complete first-run UI acceptance are not finished. See [launcher development status](docs/LAUNCHER_STATUS.md) before trying it.
-
-| Feature | Status |
-| --- | --- |
-| Live texture linking | Ported. Link raster layers, edit the PNGs in Krita or another editor, and saves sync into VRoid automatically |
-| Camera presets | Expanded implementation: ten slots per projection, clear, size/rotation, legacy import and photo-booth access. Full native acceptance pending |
-| Reference guides | Expanded implementation: multiple PNG/JPG references, screen/world placement, ruler/grid and saved presets. Full native acceptance pending |
-| Second-monitor Companion | New. A separate window listing linked layers with live thumbnails and sync status |
-| Texture snapshots and character projects | Implemented locally: named PNG versions, comparison/restore with recovery copies, independent image archives and persistent notes. Core workflows and document-session safeguards tested |
-| Managed workspace launcher | In development. Compile and file-integration checks; full first-run native acceptance pending |
-| Pose presets | Native save/load/reset tested. Legacy `.posejson` migration and remaining dialog/deletion checks pending |
-| MMD/VMD player | Implemented; head-turn playback, loop, pause, seek, stop and photo-booth exit tested. Broader motion coverage pending |
-| MP4 recording | Tested silent H.264 capture with configurable FPS/bitrate, hotkey stop and automatic finalization. Requires external FFmpeg |
-| Anti-aliasing and wireframe | Implemented; editor wireframe/restoration and a 4× AA request tested. Broader rendering acceptance pending |
-
-Feature parity remains in progress. The [completion checklist](docs/LOCAL_COMPLETION_CHECKLIST.md) and [native acceptance report](docs/WORKSPACE_NATIVE_ACCEPTANCE.md) distinguish implemented controls from verified behavior. Legacy source remains under `VRoidXYTool/` with its original attribution.
-
-### What changed from the original
-
-- **New runtime.** It is rebuilt as a BepInEx 6 IL2CPP plugin (`src/VRoidXYTool.IL2CPP`) against VRoid 2.14's generated interop APIs. The legacy Mono plugin can't load on any VRoid version after 1.26.0.
-- **Safer texture sync.** Links are tied to the document and the specific layer, so edits go only to the layer you linked, even after you select another layer or open a different model. Saves are applied only after the file stops changing and passes a PNG check. A truncated or half-written save is ignored until a valid one arrives. Imports go through VRoid's own undo/redo. Opening a different model clears all links.
-- **Multiple layers.** You can link several layers at once and switch materials while editing.
-- **Companion app.** A Windows window for a second monitor. It shows each linked layer, a thumbnail, sync status and last import time, and opens the PNG in your editor in one click.
-- **Workspace tools.** Expanded cameras and references support editing and photo-booth workflows. Pose and VMD tools operate on the active photo-booth rig and restore the previous pose when motion stops.
-- **Recording.** Silent MP4 capture runs encoding off Unity's thread, uses a bounded queue and finalizes clips before exposing the completed filename.
-
-## Requirements
-
-- Windows x64
-- VRoid Studio **2.14.0 or 2.16.0**, Unity **6000.0.62f1**. On other application/engine combinations, the editor bridge stays disabled.
-- [BepInEx 6.0.0-be.788 (Unity IL2CPP, win-x64)](https://builds.bepinex.dev/projects/bepinex_be/788/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.788%2B5b766a3.zip). Don't install it over an old BepInEx 5 setup.
-- .NET SDK with .NET 6 targeting packs to build the plugin
-- .NET 10 Windows Desktop runtime, for the Companion only
-
-## Install and use
-
-**Work on a copy of the VRoid app and a copy of your `.vroid` file.** The plugin edits documents through VRoid's internal APIs, and only the tested setup is verified.
-
-1. Install BepInEx 6 into the copied app (see [bootstrap setup](docs/IL2CPP_BOOTSTRAP.md)). Launch it once to generate `BepInEx/interop`, then close it.
-2. Build the plugin:
-
-   ```powershell
-   dotnet build src/VRoidXYTool.IL2CPP -c Release -p:BepInExRoot="C:/your-test-app/BepInEx" -p:InteropRoot="C:/your-test-app/BepInEx/interop"
-   ```
-
-3. Copy `VRoidXYTool.IL2CPP.dll`, `VRoidXYTool.SyncCore.dll` and `VRoidXYTool.CompanionCore.dll` from `src/VRoidXYTool.IL2CPP/bin/Release/net6.0/` to `BepInEx/plugins/VRoidXYTool.IL2CPP/`.
-4. Open your model, enter texture editing, select a raster layer and click **Link / export selected**.
-5. Click **Copy linked PNG path**, open the file in your editor, and save as PNG. The change appears in VRoid automatically.
-6. Save the `.vroid` normally. Saving the PNG alone doesn't save your model.
-
-**Tab** shows or hides the panel. Settings are in `BepInEx/config/io.github.nytmaer.vroidxytool.il2cpp.cfg`.
-
-Full details:
-- [Installation and usage](docs/IL2CPP_INSTALLATION.md)
-- [Second-monitor Companion](docs/COMPANION.md)
-- [Camera presets and reference guides](docs/WORKSPACE_TOOLS.md)
-- [MP4 recording](docs/RECORDING.md)
-- [Current feature acceptance and remaining checks](docs/WORKSPACE_NATIVE_ACCEPTANCE.md)
-
-## Known limits
-
-- Krita workflows were tested on VRoid Studio 2.14.0; the native document diagnostic and selected workspace smoke tests also pass on 2.16.0. Photoshop saves, broader 2.16 feature coverage and other monitor/DPI arrangements are not yet verified.
-- PNGs are limited to 4096×4096 and 64 MiB.
-- Expanded camera/reference, pose, VMD and rendering features have incomplete native acceptance; see the linked checklist.
-- Recording needs an existing FFmpeg executable with `libx264`. Hard-crash recording recovery is not implemented.
-- No installer or prebuilt download yet.
-
-Test evidence is recorded in [compatibility results](docs/COMPATIBILITY_RESULTS.md), and the migration design in the [architecture audit](docs/ARCHITECTURE_AUDIT.md).
-
-## Legacy plugin (VRoid Studio 1.26.0 and earlier)
-
-The original Mono plugin's source is kept in `VRoidXYTool/` for reference. To use the original plugin with its full feature set, install VRoid Studio 1.26.0 and follow the [upstream instructions](https://github.com/xiaoye97/VRoidXYTool).
-
-## Feedback
-
-Report bugs and suggestions in [GitHub Issues](https://github.com/nytmaer/VRoidXYTool/issues). Please don't post BepInEx or player logs publicly without removing account information first.
-
-## License
-
-MIT, copyright 2021 xiaoye97. See [LICENSE](LICENSE) for the original attribution. The IL2CPP port and Companion are released under the same license.
