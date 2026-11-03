@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework><OutputType>WinExe</OutputType><UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <AssemblyName>VRoidXYTool</AssemblyName><Version>0.4.0</Version>
+    <PayloadPath Condition="'$(PayloadPath)' == ''">../../.local/Packaging/payload.zip</PayloadPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../VRoidXYTool.LauncherCore/VRoidXYTool.LauncherCore.csproj" />
+    <EmbeddedResource Include="$(PayloadPath)" LogicalName="VRoidXYTool.Payload" />
+  </ItemGroup>
+  <Target Name="CheckPayload" BeforeTargets="PrepareForBuild"><Error Condition="!Exists('$(PayloadPath)')" Text="Build the launcher payload first with scripts/Build-Launcher.ps1." /></Target>
+</Project>

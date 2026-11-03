@@ -28,9 +28,9 @@ public sealed class Plugin : BasePlugin
         lifecycle.gameObject.SetActive(true);
         Log.LogInfo($"Lifecycle component active={lifecycle.gameObject.activeInHierarchy}, enabled={lifecycle.enabled}.");
         Log.LogInfo($"Bootstrap initialized; CLR {Environment.Version}; process {Environment.ProcessId}.");
-        if (Config.Bind("TextureSync", "Enabled", true, "Enable the experimental VRoid 2.14.0 texture bridge.").Value)
+        if (Config.Bind("TextureSync", "Enabled", true, "Enable the texture bridge for explicitly supported VRoid/Unity versions.").Value)
         {
-            if (Application.version == "2.14.0")
+            if (RuntimeCompatibility.Supports(Application.version, Application.unityVersion))
             {
                 try
                 {
@@ -44,7 +44,7 @@ public sealed class Plugin : BasePlugin
                 }
                 catch (Exception error) { Log.LogError($"Texture bridge disabled: {error}"); }
             }
-            else Log.LogWarning($"Texture bridge requires VRoid 2.14.0; detected {Application.version}.");
+            else Log.LogWarning($"Texture bridge requires VRoid {RuntimeCompatibility.SupportedVersions}; detected {Application.version} / Unity {Application.unityVersion}.");
         }
         string diagnosticPath = Config.Bind("Diagnostics", "ModelPath", "", "Opt-in disposable document test; only .local/test-models paths accepted.").Value;
         if (Bridge != null && !string.IsNullOrWhiteSpace(diagnosticPath))

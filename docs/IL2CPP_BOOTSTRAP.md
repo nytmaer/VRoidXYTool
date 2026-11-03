@@ -1,6 +1,6 @@
 # IL2CPP bootstrap
 
-Version 0.2.0 adds an experimental VRoid 2.14.0 live-texture bridge. The document diagnostic verifies live file imports and save/reopen persistence. See `LIVE_TEXTURE_PROTOTYPE.md` for usage and `COMPATIBILITY_RESULTS.md` for remaining interactive acceptance checks.
+The experimental bridge supports explicit VRoid 2.14.0 and 2.16.0 profiles on Unity 6000.0.62f1. The document diagnostic verifies live file imports and save/reopen persistence. See `LIVE_TEXTURE_PROTOTYPE.md` for usage, `COMPATIBILITY_RESULTS.md` for historical checks, and `VROID_216_COMPATIBILITY.md` for the October 30 update.
 
 ## Target and dependency pin
 

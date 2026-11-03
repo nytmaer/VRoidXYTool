@@ -13,6 +13,59 @@ try
     var read = SnapshotFile.Read(state);
     Check(read.Layers.Single().Id == "session1/layer1", "state roundtrip retains document/layer identity");
     Check(SnapshotFile.GetPngToOpen(read, "session1/layer1", now) == png, "live registered PNG can open");
+    // Real PNG fixture: history must preserve artwork and refuse a changed document or damaged archive.
+    byte[] originalPng = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=");
+    File.WriteAllBytes(png, originalPng);
+    string projectFolder = Path.Combine(root, "Character Ω"); Directory.CreateDirectory(projectFolder);
+    string projectModel = Path.Combine(projectFolder, "Avatar.vroid"); File.WriteAllText(projectModel, "disposable model fixture");
+    string projectFile = Path.Combine(projectFolder, "character-project.json");
+    var character = CharacterProject.Create(projectFile, projectModel, "Avatar Ω");
+    character.Notes = "Clothing ideas\nPalette: ocean blue"; character.Save(projectFile);
+    var projectRead = CharacterProject.Load(projectFile);
+    Check(projectRead.ModelPath == "Avatar.vroid" && projectRead.Notes == character.Notes && projectRead.Id == character.Id, "project identity, relative model association and notes survive restart");
+    Reject(() => CharacterProject.Create(projectFile, projectModel, "Duplicate"), "creating a project cannot overwrite an existing manifest");
+    var imageAsset = character.AddAsset(projectFile, png);
+    var textureAsset = character.ArchiveLinkedTexture(projectFile, state, "session1", "session1/layer1");
+    Check(textureAsset.Kind == "Texture" && textureAsset.SourceSession == "session1" && textureAsset.SourceLayerId == "session1/layer1", "project archives linked texture with explicit source identity");
+    Reject(() => character.ArchiveLinkedTexture(projectFile, state, "other-session", "session1/layer1"), "project archive rejects changed document session");
+    File.WriteAllBytes(png, new byte[] { 0 });
+    Check(File.ReadAllBytes(character.ResolveAsset(projectFile, imageAsset.Id)).SequenceEqual(originalPng), "project image remains independent when live PNG changes");
+    File.WriteAllBytes(png, originalPng);
+    string relocated = Path.Combine(root, "Moved project"); Directory.Move(projectFolder, relocated);
+    projectFile = Path.Combine(relocated, "character-project.json"); character = CharacterProject.Load(projectFile);
+    Check(File.Exists(character.ResolveModel(projectFile)) && File.Exists(character.ResolveAsset(projectFile, imageAsset.Id)), "moving a project preserves contained model and asset paths");
+    File.Delete(character.ResolveAsset(projectFile, imageAsset.Id));
+    File.Delete(character.ResolveModel(projectFile));
+    Check(CharacterProject.Load(projectFile).Assets.Count == 2, "missing models and images remain listed for recovery");
+    string externalModel = Path.Combine(root, "External.vroid"); File.WriteAllText(externalModel, "external fixture");
+    character.AssociateModel(projectFile, externalModel);
+    Check(Path.IsPathFullyQualified(CharacterProject.Load(projectFile).ModelPath) && File.ReadAllText(externalModel) == "external fixture", "explicit external model association preserves original model bytes");
+    character.Notes = new string('x', 65537);
+    Reject(() => character.Save(projectFile), "oversized notes cannot overwrite project");
+    character = CharacterProject.Load(projectFile);
+    Check(character.Notes == "Clothing ideas\nPalette: ocean blue", "invalid project save preserves prior notes");
+    character.Assets[0] = character.Assets[0] with { RelativePath = "../escaped.png" };
+    Reject(() => character.Save(projectFile), "project asset path traversal is rejected");
+    character = CharacterProject.Load(projectFile); character.SchemaVersion = 99;
+    Reject(() => character.Save(projectFile), "unknown project schemas cannot overwrite metadata");
+    File.WriteAllText(projectFile, new string(' ', 1024 * 1024 + 1));
+    Reject(() => CharacterProject.Load(projectFile), "oversized project metadata is rejected");
+    var version = TextureSnapshots.Capture(snapshot, "session1/layer1", "Before painting");
+    Check(TextureSnapshots.List(snapshot, "session1/layer1").Single().Name == "Before painting", "named texture snapshot persists");
+    // A second valid PNG is not needed to verify restoration: damaged current data must not be discarded.
+    File.WriteAllBytes(png, new byte[] { 1, 2, 3 });
+    Reject(() => TextureSnapshots.Restore(state, "session1", "session1/layer1", version.Id), "restore refuses when current artwork cannot be backed up");
+    Check(File.ReadAllBytes(png).SequenceEqual(new byte[] { 1, 2, 3 }), "failed restore preserves current bytes");
+    File.WriteAllBytes(png, originalPng);
+    TextureSnapshots.Restore(state, "session1", "session1/layer1", version.Id);
+    Check(TextureSnapshots.List(snapshot, "session1/layer1").Count == 2 && File.ReadAllBytes(png).SequenceEqual(originalPng), "restore creates recovery snapshot before replacing PNG");
+    Reject(() => TextureSnapshots.Restore(state, "other-session", "session1/layer1", version.Id), "restore rejects changed document session");
+    string archived = TextureSnapshots.GetImage(snapshot, "session1/layer1", version.Id);
+    File.WriteAllBytes(archived, new byte[] { 1 });
+    Reject(() => TextureSnapshots.Restore(state, "session1", "session1/layer1", version.Id), "corrupt archived PNG cannot overwrite artwork");
+    File.WriteAllBytes(png, originalPng[..24]);
+    Reject(() => TextureSnapshots.Capture(snapshot, "session1/layer1", "Partial save"), "partial PNG cannot become a snapshot");
+    File.WriteAllBytes(png, originalPng);
     Reject(() => SnapshotFile.GetPngToOpen(read, "session1/layer1", now.AddSeconds(7)), "stale heartbeat cannot open PNG");
     read.Running = false;
     Reject(() => SnapshotFile.GetPngToOpen(read, "session1/layer1", now), "normal shutdown cannot open PNG");
@@ -34,9 +87,10 @@ try
     Console.WriteLine("PASS: all Companion contract regressions");
     string settings = Path.Combine(root, "preferences", "settings.json");
     Check(CompanionPreferences.Load(settings).BridgePath == null, "missing preferences use defaults");
-    new CompanionPreferences { BridgePath = state, EditorPath = "C:/editor path/editor.exe" }.Save(settings);
+    new CompanionPreferences { BridgePath = state, EditorPath = "C:/editor path/editor.exe", ProjectPath = "C:/Character/character-project.json" }.Save(settings);
     var preferences = CompanionPreferences.Load(settings);
     Check(preferences.BridgePath == state && preferences.EditorPath == "C:/editor path/editor.exe", "bridge and editor preferences survive restart");
+    Check(preferences.ProjectPath == "C:/Character/character-project.json", "last project selection survives Companion restart");
     new CompanionPreferences { BridgePath = state, UseDefaultEditor = true }.Save(settings);
     Check(CompanionPreferences.Load(settings).UseDefaultEditor, "explicit default editor choice survives restart");
     File.WriteAllText(settings, "{partial"); Check(CompanionPreferences.Load(settings).EditorPath == null, "corrupt preferences recover to defaults");
@@ -99,6 +153,35 @@ try
     Reject(()=>LegacyPoseImport.Read(legacyPose),"empty legacy poses rejected before native application");
     File.WriteAllText(legacyPose,new string(' ',1024*1024+1));
     Reject(()=>LegacyPoseImport.Read(legacyPose),"oversized legacy poses rejected");
+    // Connected file workflow; this does not replace live WPF/VRoid acceptance.
+    string flowRoot = Path.Combine(root, "workflow"); Directory.CreateDirectory(flowRoot);
+    string flowPng = Path.Combine(flowRoot, "live.png"), flowState = Path.Combine(flowRoot, "bridge.json");
+    string flowModel = Path.Combine(flowRoot, "Disposable.vroid"), flowProject = Path.Combine(flowRoot, "character-project.json");
+    File.WriteAllText(flowModel, "original disposable model bytes");
+    byte[] textureA = FixturePng(255, 0, 0), textureB = FixturePng(0, 0, 255);
+    File.WriteAllBytes(flowPng, textureA);
+    var flowBridge = new BridgeSnapshot { Running = true, PublishedUtc = DateTimeOffset.UtcNow, DocumentSession = "workflow-session", ExportRoot = flowRoot,
+        Layers = new() { new LinkedTextureSnapshot { Id = "workflow-layer", Name = "Body", PngPath = flowPng } } };
+    SnapshotFile.Write(flowState, flowBridge);
+    var flow = CharacterProject.Create(flowProject, flowModel, "Workflow character");
+    flow.Notes = "End-to-end file workflow"; flow.Save(flowProject);
+    var savedA = TextureSnapshots.Capture(flowBridge, "workflow-layer", "Red before edit");
+    File.WriteAllBytes(flowPng, textureB);
+    var storedB = flow.ArchiveLinkedTexture(flowProject, flowState, "workflow-session", "workflow-layer");
+    Check(File.ReadAllBytes(TextureSnapshots.GetImage(flowBridge, "workflow-layer", savedA.Id)).SequenceEqual(textureA) &&
+        File.ReadAllBytes(flowPng).SequenceEqual(textureB), "workflow comparison reads distinct saved A and edited B");
+    TextureSnapshots.Restore(flowState, "workflow-session", "workflow-layer", savedA.Id);
+    var recovery = TextureSnapshots.List(flowBridge, "workflow-layer").Single(x => x.Id != savedA.Id);
+    Check(File.ReadAllBytes(flowPng).SequenceEqual(textureA) &&
+        File.ReadAllBytes(TextureSnapshots.GetImage(flowBridge, "workflow-layer", recovery.Id)).SequenceEqual(textureB), "workflow restore returns A and preserves edited B in recovery snapshot");
+    var reopened = CharacterProject.Load(flowProject);
+    Check(reopened.Notes == flow.Notes && File.ReadAllBytes(reopened.ResolveAsset(flowProject, storedB.Id)).SequenceEqual(textureB),
+        "workflow project restart retains notes and archived B after live PNG restore");
+    Check(File.ReadAllText(flowModel) == "original disposable model bytes", "workflow never changes model bytes");
+    flowBridge.DocumentSession = "different-model"; flowBridge.PublishedUtc = DateTimeOffset.UtcNow; SnapshotFile.Write(flowState, flowBridge);
+    Reject(() => reopened.ArchiveLinkedTexture(flowProject, flowState, "workflow-session", "workflow-layer"), "workflow document switch blocks archive from prior session");
+    Reject(() => TextureSnapshots.Restore(flowState, "workflow-session", "workflow-layer", savedA.Id), "workflow document switch blocks prior snapshot restore");
+    Check(File.ReadAllBytes(flowPng).SequenceEqual(textureA), "workflow rejected actions preserve current PNG");
 }
 finally { Directory.Delete(root, true); }
 
@@ -108,4 +191,30 @@ static void Reject(Action action, string name)
     bool rejected = false;
     try { action(); } catch (Exception error) when (error is InvalidOperationException or IOException or InvalidDataException or System.Text.Json.JsonException) { rejected = true; }
     Check(rejected, name);
+}
+
+static byte[] FixturePng(byte red, byte green, byte blue)
+{
+    using var output = new MemoryStream();
+    output.Write(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 });
+    Chunk("IHDR", new byte[] { 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0 });
+    using var compressed = new MemoryStream();
+    using (var zlib = new System.IO.Compression.ZLibStream(compressed, System.IO.Compression.CompressionLevel.Fastest, true))
+        zlib.Write(new byte[] { 0, red, green, blue, 255 });
+    Chunk("IDAT", compressed.ToArray()); Chunk("IEND", Array.Empty<byte>());
+    return output.ToArray();
+
+    void Chunk(string type, byte[] bytes)
+    {
+        Span<byte> number = stackalloc byte[4];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(number, (uint)bytes.Length); output.Write(number);
+        byte[] kind = System.Text.Encoding.ASCII.GetBytes(type); output.Write(kind); output.Write(bytes);
+        uint checksum = 0xffffffff;
+        foreach (byte value in kind.Concat(bytes))
+        {
+            checksum ^= value;
+            for (int i = 0; i < 8; i++) checksum = (checksum >> 1) ^ ((checksum & 1) == 0 ? 0 : 0xedb88320u);
+        }
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(number, ~checksum); output.Write(number);
+    }
 }

@@ -1,6 +1,6 @@
 # Experimental IL2CPP live texture installation
 
-Supported test target: Windows x64, VRoid Studio 2.14.0 (Unity 6000.0.62f1), BepInEx 6.0.0-be.788+5b766a3. Other VRoid versions disable the adapter. This branch includes live texture linking and an edit-mode camera/reference slice; pose and other tools remain legacy code.
+Supported test targets: Windows x64, VRoid Studio 2.14.0 or 2.16.0 (Unity 6000.0.62f1), BepInEx 6.0.0-be.788+5b766a3. Other application/engine combinations disable the adapter. The port includes live texture linking, camera/reference tools, photo-booth pose/VMD controls and recording. See VROID_216_COMPATIBILITY.md for the exact 2.16 validation coverage; broader feature checks remain incomplete.
 
 1. Make a separate copy of the installed VRoid application and a disposable copy of your `.vroid`. Follow `IL2CPP_BOOTSTRAP.md` to install the pinned BepInEx IL2CPP runtime in that application copy. Do not combine the old BepInEx 5 installation with the new loader. The copied app still uses per-user settings and custom-item storage.
 2. Launch the copied app once to generate its `BepInEx/interop` assemblies, then close it. Build with a .NET SDK supporting net6.0:

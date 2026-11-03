@@ -98,7 +98,7 @@ internal sealed class VRoid214Bridge : IDisposable
                 ownsBackgroundSetting = true;
                 Application.runInBackground = true;
             }
-            log.LogInfo("VRoid 2.14 texture selection hook installed. Tab opens linked texture controls.");
+            log.LogInfo($"VRoid {Application.version} texture selection hook installed. Tab opens linked texture controls.");
             if (statePath != null) log.LogInfo("Companion bridge state: " + statePath);
         }
         catch

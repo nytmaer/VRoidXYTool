@@ -7,6 +7,7 @@ public sealed class CompanionPreferences
     public string? BridgePath { get; set; }
     public string? EditorPath { get; set; }
     public bool UseDefaultEditor { get; set; }
+    public string? ProjectPath { get; set; }
 
     public static CompanionPreferences Load(string path)
     {
